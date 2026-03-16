@@ -1,127 +1,111 @@
-// src/pages/Trading.js
 import React, { useState } from "react";
 import MainLayout from "../layout/MainLayout";
-
-const API_BASE = "http://localhost:4000";
+import LoadingCard from "../components/LoadingCard";
+import { apiRequest } from "../config/apiClient";
+import { useAuth } from "../context/AuthContext";
+import useAsyncData from "../hooks/useAsyncData";
+import { formatCurrency } from "../utils/formatters";
 
 export default function Trading() {
+  const { token } = useAuth();
   const [symbol, setSymbol] = useState("BTC/USDT");
   const [side, setSide] = useState("Buy");
-  const [qty, setQty] = useState(1);
+  const [quantity, setQuantity] = useState(1);
   const [orderType, setOrderType] = useState("Market");
   const [limitPrice, setLimitPrice] = useState("");
+  const [stopLoss, setStopLoss] = useState("");
   const [timeInForce, setTimeInForce] = useState("Day");
-
-  const [positions, setPositions] = useState([
-    { symbol: "BTC/USDT", qty: 0.1, avgPrice: 42000, unrealizedPL: 120 },
-    { symbol: "ETH/USDT", qty: 0.5, avgPrice: 2300, unrealizedPL: -35 },
-  ]);
-
-  const [orders, setOrders] = useState([
-    { id: 1, text: "BUY 0.10 BTC/USDT @ 40,500 — Filled (Simulated)" },
-    { id: 2, text: "SELL 0.50 ETH/USDT @ 2,350 — Filled (Simulated)" },
-  ]);
-
   const [submitError, setSubmitError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  async function handleSubmit(e) {
-    e.preventDefault();
+  const { data, setData, loading, error } = useAsyncData(async () => {
+    const [portfolio, orders, market] = await Promise.all([
+      apiRequest("/api/portfolio", { token }),
+      apiRequest("/api/portfolio/orders", { token }),
+      apiRequest("/api/market/overview"),
+    ]);
 
-    const qtyNumber = Number(qty) || 0;
-    if (!symbol || qtyNumber <= 0) return;
+    return { portfolio, orders, market };
+  }, [token]);
 
-    const priceText =
-      orderType === "Market"
-        ? "MKT"
-        : limitPrice
-        ? Number(limitPrice).toFixed(2)
-        : "LIMIT";
+  async function handleSubmit(event) {
+    event.preventDefault();
 
-    const localText = `${side.toUpperCase()} ${qtyNumber} ${symbol.toUpperCase()} @ ${priceText} — Simulated`;
-
-    // 1) Update local UI immediately (for responsiveness)
-    const localOrder = { id: Date.now(), text: localText };
-    setOrders((prev) => [localOrder, ...prev]);
-
-    const sign = side === "Buy" ? 1 : -1;
-
-    setPositions((prev) => {
-      const existing = prev.find(
-        (p) => p.symbol.toUpperCase() === symbol.toUpperCase()
-      );
-      if (!existing) {
-        return [
-          ...prev,
-          {
-            symbol: symbol.toUpperCase(),
-            qty: sign * qtyNumber,
-            avgPrice: limitPrice ? Number(limitPrice) : 100,
-            unrealizedPL: 0,
-          },
-        ];
-      }
-
-      return prev.map((p) => {
-        if (p.symbol.toUpperCase() !== symbol.toUpperCase()) return p;
-        return {
-          ...p,
-          qty: p.qty + sign * qtyNumber,
-        };
-      });
-    });
-
-    // 2) Also send to backend for persistence (best-effort)
     try {
       setSubmitting(true);
       setSubmitError("");
 
-      const res = await fetch(`${API_BASE}/api/trades`, {
+      const result = await apiRequest("/api/trading/orders", {
+        token,
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           side,
           symbol,
-          qty: qtyNumber,
-          price: orderType === "Market" ? 0 : Number(limitPrice) || 0,
-          note: "Submitted from Trading UI (simulated)",
+          quantity: Number(quantity),
+          orderType,
+          limitPrice: orderType === "Limit" ? Number(limitPrice) || null : null,
+          stopLoss: stopLoss ? Number(stopLoss) : null,
+          timeInForce,
+          note: "Submitted from trading page",
         }),
       });
 
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || `Server returned ${res.status}`);
-      }
+      setData((prev) => ({
+        ...prev,
+        portfolio: result.portfolio,
+        orders: [result.order, ...(prev?.orders || [])],
+      }));
 
-      // backendTrade is not strictly needed right now, but you *could* use it
-      // const backendTrade = await res.json();
-    } catch (err) {
-      console.error("Failed to send trade to backend:", err);
-      setSubmitError("Order recorded locally but backend call failed.");
+      setQuantity(1);
+      setLimitPrice("");
+      setStopLoss("");
+    } catch (submitErr) {
+      setSubmitError(submitErr.message || "Failed to place order");
     } finally {
       setSubmitting(false);
     }
-
-    // Reset qty but keep symbol/side
-    setQty(1);
   }
 
   function handleReset() {
     setSymbol("BTC/USDT");
     setSide("Buy");
-    setQty(1);
+    setQuantity(1);
     setOrderType("Market");
     setLimitPrice("");
+    setStopLoss("");
     setTimeInForce("Day");
     setSubmitError("");
   }
+
+  if (loading) {
+    return (
+      <MainLayout>
+        <LoadingCard text="Loading trading workspace..." />
+      </MainLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <MainLayout>
+        <div className="card" style={{ color: "#fecaca" }}>
+          {error}
+        </div>
+      </MainLayout>
+    );
+  }
+
+  const market = data?.market || [];
+  const selectedMarket = market.find((item) => item.pair === symbol);
+  const positions = data?.portfolio?.holdings || [];
+  const orders = data?.orders || [];
 
   return (
     <MainLayout>
       <h1 className="page-title">Trading Module — Place Orders</h1>
       <p className="page-subtitle">
-        This form simulates order placement and also records trades through the
-        backend API.
+        Submit market or limit orders using virtual funds and track portfolio
+        changes immediately.
       </p>
 
       <div
@@ -131,11 +115,9 @@ export default function Trading() {
           gap: "16px",
         }}
       >
-        {/* LEFT: Order ticket */}
         <div className="card">
-          <h2>Order Ticket (Simulated)</h2>
+          <h2>Order Ticket</h2>
           <form onSubmit={handleSubmit}>
-            {/* Row 1: symbol + side */}
             <div
               style={{
                 display: "grid",
@@ -151,20 +133,13 @@ export default function Trading() {
                 <select
                   value={symbol}
                   onChange={(e) => setSymbol(e.target.value)}
-                  style={{
-                    marginTop: 4,
-                    width: "100%",
-                    padding: 8,
-                    borderRadius: 8,
-                    border: "1px solid #1f2937",
-                    background: "#111827",
-                    color: "#f9fafb",
-                  }}
+                  style={inputStyle}
                 >
                   <option>BTC/USDT</option>
                   <option>ETH/USDT</option>
                   <option>SOL/USDT</option>
                   <option>ADA/USDT</option>
+                  <option>BNB/USDT</option>
                 </select>
               </div>
               <div>
@@ -172,15 +147,7 @@ export default function Trading() {
                 <select
                   value={side}
                   onChange={(e) => setSide(e.target.value)}
-                  style={{
-                    marginTop: 4,
-                    width: "100%",
-                    padding: 8,
-                    borderRadius: 8,
-                    border: "1px solid #1f2937",
-                    background: "#111827",
-                    color: "#f9fafb",
-                  }}
+                  style={inputStyle}
                 >
                   <option>Buy</option>
                   <option>Sell</option>
@@ -188,7 +155,6 @@ export default function Trading() {
               </div>
             </div>
 
-            {/* Row 2: qty + order type */}
             <div
               style={{
                 display: "grid",
@@ -198,24 +164,14 @@ export default function Trading() {
               }}
             >
               <div>
-                <label style={{ fontSize: 13, color: "#cbd5f5" }}>
-                  Quantity
-                </label>
+                <label style={{ fontSize: 13, color: "#cbd5f5" }}>Quantity</label>
                 <input
                   type="number"
                   min="0"
                   step="0.01"
-                  value={qty}
-                  onChange={(e) => setQty(e.target.value)}
-                  style={{
-                    marginTop: 4,
-                    width: "100%",
-                    padding: 8,
-                    borderRadius: 8,
-                    border: "1px solid #1f2937",
-                    background: "#111827",
-                    color: "#f9fafb",
-                  }}
+                  value={quantity}
+                  onChange={(e) => setQuantity(e.target.value)}
+                  style={inputStyle}
                 />
               </div>
               <div>
@@ -225,15 +181,7 @@ export default function Trading() {
                 <select
                   value={orderType}
                   onChange={(e) => setOrderType(e.target.value)}
-                  style={{
-                    marginTop: 4,
-                    width: "100%",
-                    padding: 8,
-                    borderRadius: 8,
-                    border: "1px solid #1f2937",
-                    background: "#111827",
-                    color: "#f9fafb",
-                  }}
+                  style={inputStyle}
                 >
                   <option>Market</option>
                   <option>Limit</option>
@@ -241,7 +189,6 @@ export default function Trading() {
               </div>
             </div>
 
-            {/* Limit price */}
             <div style={{ marginBottom: "10px" }}>
               <label style={{ fontSize: 13, color: "#cbd5f5" }}>
                 Limit Price (USDT)
@@ -250,20 +197,24 @@ export default function Trading() {
                 type="number"
                 value={limitPrice}
                 onChange={(e) => setLimitPrice(e.target.value)}
-                placeholder="Used when Order Type = Limit"
-                style={{
-                  marginTop: 4,
-                  width: "100%",
-                  padding: 8,
-                  borderRadius: 8,
-                  border: "1px solid #1f2937",
-                  background: "#111827",
-                  color: "#f9fafb",
-                }}
+                placeholder="Required for limit orders"
+                style={inputStyle}
               />
             </div>
 
-            {/* Time in force */}
+            <div style={{ marginBottom: "10px" }}>
+              <label style={{ fontSize: 13, color: "#cbd5f5" }}>
+                Stop-Loss (optional)
+              </label>
+              <input
+                type="number"
+                value={stopLoss}
+                onChange={(e) => setStopLoss(e.target.value)}
+                placeholder="Used by the learning engine"
+                style={inputStyle}
+              />
+            </div>
+
             <div style={{ marginBottom: "16px" }}>
               <label style={{ fontSize: 13, color: "#cbd5f5" }}>
                 Time in Force
@@ -271,35 +222,19 @@ export default function Trading() {
               <select
                 value={timeInForce}
                 onChange={(e) => setTimeInForce(e.target.value)}
-                style={{
-                  marginTop: 4,
-                  width: "100%",
-                  padding: 8,
-                  borderRadius: 8,
-                  border: "1px solid #1f2937",
-                  background: "#111827",
-                  color: "#f9fafb",
-                }}
+                style={inputStyle}
               >
                 <option>Day</option>
                 <option>GTC</option>
               </select>
             </div>
 
-            {/* Error, if backend fails */}
-            {submitError && (
-              <div
-                style={{
-                  marginBottom: 10,
-                  fontSize: 12,
-                  color: "#fca5a5",
-                }}
-              >
+            {submitError ? (
+              <div style={{ marginBottom: 10, fontSize: 12, color: "#fca5a5" }}>
                 {submitError}
               </div>
-            )}
+            ) : null}
 
-            {/* Buttons */}
             <div style={{ display: "flex", gap: 8 }}>
               <button
                 type="submit"
@@ -309,12 +244,10 @@ export default function Trading() {
                   padding: 10,
                   borderRadius: 8,
                   border: "none",
-                  background:
-                    side === "Buy" ? "#22c55e" : "#f87171",
-                  opacity: submitting ? 0.8 : 1,
+                  background: side === "Buy" ? "#22c55e" : "#f87171",
                   color: "#0b0f19",
                   fontWeight: 600,
-                  cursor: submitting ? "default" : "pointer",
+                  cursor: "pointer",
                 }}
               >
                 {submitting ? "Submitting..." : "Submit Order"}
@@ -323,11 +256,12 @@ export default function Trading() {
                 type="button"
                 onClick={handleReset}
                 style={{
-                  padding: "10px 14px",
+                  flex: 1,
+                  padding: 10,
                   borderRadius: 8,
-                  border: "1px solid #4b5563",
+                  border: "1px solid #374151",
                   background: "transparent",
-                  color: "#e5e7eb",
+                  color: "#f9fafb",
                   cursor: "pointer",
                 }}
               >
@@ -337,131 +271,106 @@ export default function Trading() {
           </form>
         </div>
 
-        {/* RIGHT: same as before – market snapshot, positions, orders, news */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateRows: "auto auto auto",
-            gap: "16px",
-          }}
-        >
+        <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
           <div className="card">
-            <h2>Market Snapshot (Simulated)</h2>
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Pair</th>
-                  <th>Last</th>
-                  <th>24h Change</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>BTC/USDT</td>
-                  <td>$42,310</td>
-                  <td className="text-green">+2.1%</td>
-                </tr>
-                <tr>
-                  <td>ETH/USDT</td>
-                  <td>$2,310</td>
-                  <td className="text-red">-0.8%</td>
-                </tr>
-                <tr>
-                  <td>SOL/USDT</td>
-                  <td>$98.20</td>
-                  <td className="text-green">+4.3%</td>
-                </tr>
-              </tbody>
-            </table>
+            <h2>Account Snapshot</h2>
+            <p className="text-muted" style={{ fontSize: 13 }}>
+              Cash balance: {formatCurrency(data.portfolio.cashBalance)} | Equity:{" "}
+              {formatCurrency(data.portfolio.equityValue)}
+            </p>
+            <p className="text-muted" style={{ fontSize: 13 }}>
+              Current price for {symbol}:{" "}
+              {selectedMarket ? formatCurrency(selectedMarket.price, 4) : "--"}
+            </p>
           </div>
 
           <div className="card">
-            <h2>Open Positions (Simulated)</h2>
+            <h2>Open Positions</h2>
             <table className="table">
               <thead>
                 <tr>
-                  <th>Pair</th>
+                  <th>Symbol</th>
                   <th>Qty</th>
                   <th>Avg Price</th>
-                  <th>P/L</th>
+                  <th>Unrealized P/L</th>
                 </tr>
               </thead>
               <tbody>
-                {positions.map((p) => (
-                  <tr key={p.symbol}>
-                    <td>{p.symbol}</td>
-                    <td>{p.qty}</td>
-                    <td>${p.avgPrice.toFixed(2)}</td>
-                    <td
-                      className={
-                        p.unrealizedPL >= 0 ? "text-green" : "text-red"
-                      }
-                    >
-                      {p.unrealizedPL >= 0 ? "+" : ""}
-                      {p.unrealizedPL}
+                {positions.length === 0 ? (
+                  <tr>
+                    <td colSpan="4" className="text-muted">
+                      No open positions.
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  positions.map((position) => (
+                    <tr key={position.id}>
+                      <td>{position.pair}</td>
+                      <td>{position.quantity}</td>
+                      <td>{formatCurrency(position.averagePrice, 4)}</td>
+                      <td
+                        className={
+                          position.unrealizedPl >= 0 ? "text-green" : "text-red"
+                        }
+                      >
+                        {formatCurrency(position.unrealizedPl)}
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
 
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1.4fr 1.6fr",
-              gap: "16px",
-            }}
-          >
-            <div className="card">
-              <h2>Recent Orders</h2>
-              <ul
-                style={{
-                  fontSize: 13,
-                  paddingLeft: 18,
-                  margin: 0,
-                  lineHeight: 1.6,
-                }}
-              >
-                {orders.map((o) => (
-                  <li key={o.id}>{o.text}</li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="card">
-              <h2>Latest News for {symbol}</h2>
-              <ul
-                style={{
-                  fontSize: 13,
-                  paddingLeft: 18,
-                  margin: 0,
-                  lineHeight: 1.6,
-                }}
-              >
-                <li>
-                  {symbol} volatility expected to increase this week
-                  (simulated).
-                </li>
-                <li>
-                  Funding rates normalize as traders reduce leverage
-                  (simulated).
-                </li>
-                <li>
-                  Market sentiment: cautiously bullish on majors (simulated).
-                </li>
-              </ul>
-              <p
-                className="text-muted"
-                style={{ marginTop: 8, fontSize: 11 }}
-              >
-                * In a later milestone this will be powered by a real news API
-                for the selected asset.
-              </p>
-            </div>
+          <div className="card">
+            <h2>Recent Orders</h2>
+            <ul
+              style={{
+                listStyle: "none",
+                padding: 0,
+                margin: 0,
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
+              }}
+            >
+              {orders.length === 0 ? (
+                <li className="text-muted">No orders placed yet.</li>
+              ) : (
+                orders.map((order) => (
+                  <li
+                    key={order.id}
+                    style={{
+                      padding: "10px 12px",
+                      borderRadius: 10,
+                      background: "#0f172a",
+                      border: "1px solid #1f2937",
+                      fontSize: 13,
+                    }}
+                  >
+                    {order.side} {order.quantity} {order.pair} @{" "}
+                    {formatCurrency(
+                      order.executedPrice || order.requestedPrice || 0,
+                      4
+                    )}{" "}
+                    - {order.status}
+                  </li>
+                ))
+              )}
+            </ul>
           </div>
         </div>
       </div>
     </MainLayout>
   );
 }
+
+const inputStyle = {
+  marginTop: 4,
+  width: "100%",
+  padding: 8,
+  borderRadius: 8,
+  border: "1px solid #1f2937",
+  background: "#111827",
+  color: "#f9fafb",
+};

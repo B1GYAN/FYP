@@ -1,34 +1,51 @@
-// src/pages/StrategyLab.js
 import React, { useState } from "react";
 import MainLayout from "../layout/MainLayout";
+import { apiRequest } from "../config/apiClient";
+import { useAuth } from "../context/AuthContext";
 
 export default function StrategyLab() {
-  const [timeframe, setTimeframe] = useState("6M");
+  const { token } = useAuth();
+  const [timeframe, setTimeframe] = useState("1H");
+  const [symbol, setSymbol] = useState("BTC");
   const [startingBalance, setStartingBalance] = useState(10000);
-  const [riskPerTrade, setRiskPerTrade] = useState(1);
+  const [fastMa, setFastMa] = useState(5);
+  const [slowMa, setSlowMa] = useState(12);
+  const [rsiSellThreshold, setRsiSellThreshold] = useState(70);
   const [result, setResult] = useState(null);
+  const [error, setError] = useState("");
+  const [running, setRunning] = useState(false);
 
-  function runBacktest() {
-    const rand = Math.random();
-    const totalReturn = (rand * 40 - 10).toFixed(2); // -10% to +30%
-    const maxDrawdown = (rand * 20).toFixed(2); // 0–20%
-    const winRate = (50 + rand * 30).toFixed(1); // 50–80%
-    const trades = Math.floor(20 + rand * 40);
-
-    setResult({
-      totalReturn,
-      maxDrawdown,
-      winRate,
-      trades,
-    });
+  async function runBacktest() {
+    try {
+      setRunning(true);
+      setError("");
+      const data = await apiRequest("/api/strategy/backtest", {
+        token,
+        method: "POST",
+        body: JSON.stringify({
+          symbol,
+          quote: "USDT",
+          timeframe,
+          startingBalance: Number(startingBalance),
+          fastMa: Number(fastMa),
+          slowMa: Number(slowMa),
+          rsiSellThreshold: Number(rsiSellThreshold),
+        }),
+      });
+      setResult(data);
+    } catch (runError) {
+      setError(runError.message || "Backtest failed");
+    } finally {
+      setRunning(false);
+    }
   }
 
   return (
     <MainLayout>
       <h1 className="page-title">Strategy Lab — Backtesting Workspace</h1>
       <p className="page-subtitle">
-        Experiment with risk parameters and timeframes to understand how a
-        strategy might perform historically (simulated).
+        Test a simple moving-average crossover strategy with an RSI-based exit
+        rule against historical market data.
       </p>
 
       <div
@@ -38,76 +55,45 @@ export default function StrategyLab() {
           gap: "16px",
         }}
       >
-        {/* LEFT: configuration */}
         <div className="card">
           <h2>Backtest Settings</h2>
 
-          <div style={{ marginBottom: 10 }}>
-            <label style={{ fontSize: 13, color: "#cbd5f5" }}>
-              Timeframe
-            </label>
-            <select
-              value={timeframe}
-              onChange={(e) => setTimeframe(e.target.value)}
-              style={{
-                marginTop: 4,
-                width: "100%",
-                padding: 8,
-                borderRadius: 8,
-                border: "1px solid #1f2937",
-                background: "#111827",
-                color: "#f9fafb",
-              }}
-            >
-              <option value="3M">Last 3 months</option>
-              <option value="6M">Last 6 months</option>
-              <option value="1Y">Last 1 year</option>
-              <option value="5Y">Last 5 years</option>
+          <Field label="Symbol">
+            <select value={symbol} onChange={(e) => setSymbol(e.target.value)} style={controlStyle}>
+              <option value="BTC">BTC</option>
+              <option value="ETH">ETH</option>
+              <option value="SOL">SOL</option>
             </select>
-          </div>
+          </Field>
 
-          <div style={{ marginBottom: 10 }}>
-            <label style={{ fontSize: 13, color: "#cbd5f5" }}>
-              Starting Balance (USDT)
-            </label>
-            <input
-              type="number"
-              value={startingBalance}
-              onChange={(e) => setStartingBalance(e.target.value)}
-              style={{
-                marginTop: 4,
-                width: "100%",
-                padding: 8,
-                borderRadius: 8,
-                border: "1px solid #1f2937",
-                background: "#111827",
-                color: "#f9fafb",
-              }}
-            />
-          </div>
+          <Field label="Timeframe">
+            <select value={timeframe} onChange={(e) => setTimeframe(e.target.value)} style={controlStyle}>
+              <option value="15M">15 minutes</option>
+              <option value="1H">1 hour</option>
+              <option value="4H">4 hours</option>
+              <option value="1D">1 day</option>
+            </select>
+          </Field>
 
-          <div style={{ marginBottom: 16 }}>
-            <label style={{ fontSize: 13, color: "#cbd5f5" }}>
-              Risk per Trade (%)
-            </label>
-            <input
-              type="number"
-              value={riskPerTrade}
-              onChange={(e) => setRiskPerTrade(e.target.value)}
-              style={{
-                marginTop: 4,
-                width: "100%",
-                padding: 8,
-                borderRadius: 8,
-                border: "1px solid #1f2937",
-                background: "#111827",
-                color: "#f9fafb",
-              }}
-            />
-          </div>
+          <Field label="Starting Balance (USDT)">
+            <input type="number" value={startingBalance} onChange={(e) => setStartingBalance(e.target.value)} style={controlStyle} />
+          </Field>
+
+          <Field label="Fast Moving Average">
+            <input type="number" value={fastMa} onChange={(e) => setFastMa(e.target.value)} style={controlStyle} />
+          </Field>
+
+          <Field label="Slow Moving Average">
+            <input type="number" value={slowMa} onChange={(e) => setSlowMa(e.target.value)} style={controlStyle} />
+          </Field>
+
+          <Field label="RSI Sell Threshold">
+            <input type="number" value={rsiSellThreshold} onChange={(e) => setRsiSellThreshold(e.target.value)} style={controlStyle} />
+          </Field>
 
           <button
             onClick={runBacktest}
+            disabled={running}
             style={{
               width: "100%",
               padding: 10,
@@ -119,16 +105,14 @@ export default function StrategyLab() {
               cursor: "pointer",
             }}
           >
-            Run Backtest (Simulated)
+            {running ? "Running Backtest..." : "Run Backtest"}
           </button>
 
-          <p className="text-muted" style={{ marginTop: 8, fontSize: 11 }}>
-            In the full system this will call a backend service to run a real
-            backtest on historical data and return detailed metrics.
-          </p>
+          {error ? (
+            <p style={{ marginTop: 8, fontSize: 12, color: "#fecaca" }}>{error}</p>
+          ) : null}
         </div>
 
-        {/* RIGHT: results */}
         <div className="card">
           <h2>Backtest Results</h2>
 
@@ -136,8 +120,8 @@ export default function StrategyLab() {
             <>
               <p style={{ fontSize: 13, marginBottom: 10 }}>
                 Timeframe: <strong>{timeframe}</strong> | Starting balance:{" "}
-                <strong>${startingBalance}</strong> | Risk/trade:{" "}
-                <strong>{riskPerTrade}%</strong>
+                <strong>${startingBalance}</strong> | MA setup:{" "}
+                <strong>{fastMa}/{slowMa}</strong>
               </p>
 
               <ul
@@ -150,13 +134,7 @@ export default function StrategyLab() {
               >
                 <li>
                   Total return:{" "}
-                  <strong
-                    className={
-                      Number(result.totalReturn) >= 0
-                        ? "text-green"
-                        : "text-red"
-                    }
-                  >
+                  <strong className={result.totalReturn >= 0 ? "text-green" : "text-red"}>
                     {result.totalReturn}%
                   </strong>
                 </li>
@@ -167,7 +145,10 @@ export default function StrategyLab() {
                   Win rate: <strong>{result.winRate}%</strong>
                 </li>
                 <li>
-                  Number of trades: <strong>{result.trades}</strong>
+                  Number of trades: <strong>{result.tradeCount}</strong>
+                </li>
+                <li>
+                  Final equity: <strong>${result.finalEquity}</strong>
                 </li>
               </ul>
 
@@ -179,15 +160,19 @@ export default function StrategyLab() {
                   color: "#9ca3af",
                 }}
               >
-                Equity curve / distribution charts can be added here in future
-                milestones to give a richer visual understanding of the
-                strategy&apos;s behavior.
+                Latest signals:{" "}
+                {result.trades.length === 0
+                  ? "No closed trades generated."
+                  : result.trades
+                      .slice(-3)
+                      .map((trade) => `${trade.side} @ ${trade.price}`)
+                      .join(" | ")}
               </div>
             </>
           ) : (
             <p style={{ fontSize: 13, color: "#9ca3af" }}>
-              Configure your strategy parameters on the left and click{" "}
-              <strong>Run Backtest</strong> to generate simulated results.
+              Configure your strategy on the left and run a backtest to generate
+              total return, win rate, max drawdown, and trade count.
             </p>
           )}
         </div>
@@ -195,3 +180,21 @@ export default function StrategyLab() {
     </MainLayout>
   );
 }
+
+function Field({ label, children }) {
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <label style={{ fontSize: 13, color: "#cbd5f5" }}>{label}</label>
+      <div style={{ marginTop: 4 }}>{children}</div>
+    </div>
+  );
+}
+
+const controlStyle = {
+  width: "100%",
+  padding: 8,
+  borderRadius: 8,
+  border: "1px solid #1f2937",
+  background: "#111827",
+  color: "#f9fafb",
+};

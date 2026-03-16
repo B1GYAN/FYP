@@ -1,10 +1,12 @@
 // src/pages/Watchlist.js
 import React, { useState, useEffect } from "react";
 import MainLayout from "../layout/MainLayout";
-
-const API_BASE = "http://localhost:5000";
+import { apiRequest } from "../config/apiClient";
+import { useAuth } from "../context/AuthContext";
+import { formatCurrency } from "../utils/formatters";
 
 export default function Watchlist() {
+  const { token } = useAuth();
   const [items, setItems] = useState([]);
   const [newPair, setNewPair] = useState("");
   const [loading, setLoading] = useState(true);
@@ -17,11 +19,7 @@ export default function Watchlist() {
       try {
         setLoading(true);
         setError("");
-        const res = await fetch(`${API_BASE}/api/watchlist`);
-        if (!res.ok) {
-          throw new Error(`Server returned ${res.status}`);
-        }
-        const data = await res.json();
+        const data = await apiRequest("/api/watchlist", { token });
         setItems(data);
       } catch (err) {
         console.error("Failed to load watchlist:", err);
@@ -32,7 +30,7 @@ export default function Watchlist() {
     }
 
     fetchWatchlist();
-  }, []);
+  }, [token]);
 
   // ---- Add pair via backend ----
   async function addPair(e) {
@@ -44,26 +42,11 @@ export default function Watchlist() {
       setAdding(true);
       setError("");
 
-      const res = await fetch(`${API_BASE}/api/watchlist`, {
+      const newItem = await apiRequest("/api/watchlist", {
+        token,
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ pair: trimmed }),
       });
-
-      if (res.status === 409) {
-        // Already exists
-        const body = await res.json();
-        setError("Pair is already in your watchlist.");
-        setNewPair("");
-        return;
-      }
-
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || `Server returned ${res.status}`);
-      }
-
-      const newItem = await res.json();
       setItems((prev) => [...prev, newItem]);
       setNewPair("");
     } catch (err) {
@@ -78,8 +61,7 @@ export default function Watchlist() {
     <MainLayout>
       <h1 className="page-title">Watchlist</h1>
       <p className="page-subtitle">
-        Watchlist data is now backed by the Node/Express API (simulated for
-        Milestone&nbsp;3).
+        Watchlist data is backed by the Node/Express API and PostgreSQL.
       </p>
 
       {/* Add form */}
@@ -166,7 +148,7 @@ export default function Watchlist() {
               {items.map((s) => (
                 <tr key={s.id}>
                   <td>{s.pair}</td>
-                  <td>{s.price === "--" ? "--" : `$${s.price}`}</td>
+                  <td>{s.price === "--" ? "--" : formatCurrency(s.price, 4)}</td>
                   <td
                     className={
                       s.change && s.change.toString().startsWith("+")
@@ -183,9 +165,8 @@ export default function Watchlist() {
         )}
 
         <p className="text-muted" style={{ marginTop: 8, fontSize: 11 }}>
-          For now, prices and changes are simulated in-memory on the backend.
-          In a later milestone this endpoint can be wired to real market data or
-          a PostgreSQL database.
+          Live market pricing will be connected in the next phase through a
+          dedicated market data service layer.
         </p>
       </div>
     </MainLayout>

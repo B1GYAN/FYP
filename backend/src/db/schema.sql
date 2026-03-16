@@ -1,0 +1,175 @@
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+CREATE TABLE IF NOT EXISTS users (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  full_name VARCHAR(120) NOT NULL,
+  email VARCHAR(255) NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  starting_balance NUMERIC(14, 2) NOT NULL DEFAULT 10000.00,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS portfolios (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  cash_balance NUMERIC(14, 2) NOT NULL DEFAULT 10000.00,
+  equity_value NUMERIC(14, 2) NOT NULL DEFAULT 10000.00,
+  realized_pl NUMERIC(14, 2) NOT NULL DEFAULT 0,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (user_id)
+);
+
+CREATE TABLE IF NOT EXISTS watchlist (
+  id SERIAL PRIMARY KEY,
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  symbol VARCHAR(20) NOT NULL,
+  quote VARCHAR(20) NOT NULL DEFAULT 'USDT',
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS watchlist_unique_pair_per_user
+  ON watchlist (COALESCE(user_id, '00000000-0000-0000-0000-000000000000'::uuid), symbol, quote);
+
+CREATE TABLE IF NOT EXISTS holdings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  portfolio_id UUID NOT NULL REFERENCES portfolios(id) ON DELETE CASCADE,
+  symbol VARCHAR(20) NOT NULL,
+  quote VARCHAR(20) NOT NULL DEFAULT 'USDT',
+  quantity NUMERIC(18, 8) NOT NULL DEFAULT 0,
+  average_price NUMERIC(18, 8) NOT NULL DEFAULT 0,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (portfolio_id, symbol, quote)
+);
+
+CREATE TABLE IF NOT EXISTS orders (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  portfolio_id UUID NOT NULL REFERENCES portfolios(id) ON DELETE CASCADE,
+  symbol VARCHAR(20) NOT NULL,
+  quote VARCHAR(20) NOT NULL DEFAULT 'USDT',
+  side VARCHAR(10) NOT NULL,
+  order_type VARCHAR(10) NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+  quantity NUMERIC(18, 8) NOT NULL,
+  requested_price NUMERIC(18, 8),
+  executed_price NUMERIC(18, 8),
+  executed_at TIMESTAMP,
+  notes TEXT,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS transactions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  order_id UUID REFERENCES orders(id) ON DELETE SET NULL,
+  portfolio_id UUID NOT NULL REFERENCES portfolios(id) ON DELETE CASCADE,
+  symbol VARCHAR(20) NOT NULL,
+  quote VARCHAR(20) NOT NULL DEFAULT 'USDT',
+  side VARCHAR(10) NOT NULL,
+  quantity NUMERIC(18, 8) NOT NULL,
+  price NUMERIC(18, 8) NOT NULL,
+  gross_value NUMERIC(18, 8) NOT NULL,
+  realized_pl NUMERIC(18, 8) NOT NULL DEFAULT 0,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS market_assets (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  symbol VARCHAR(20) NOT NULL,
+  quote VARCHAR(20) NOT NULL DEFAULT 'USDT',
+  asset_type VARCHAR(20) NOT NULL DEFAULT 'CRYPTO',
+  provider_symbol VARCHAR(40),
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (symbol, quote, asset_type)
+);
+
+CREATE TABLE IF NOT EXISTS lessons (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  slug VARCHAR(120) NOT NULL UNIQUE,
+  title VARCHAR(255) NOT NULL,
+  category VARCHAR(80) NOT NULL,
+  level VARCHAR(40) NOT NULL,
+  summary TEXT NOT NULL,
+  content TEXT NOT NULL,
+  estimated_minutes INTEGER NOT NULL DEFAULT 10,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS quizzes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  lesson_id UUID NOT NULL REFERENCES lessons(id) ON DELETE CASCADE,
+  title VARCHAR(255) NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS quiz_questions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  quiz_id UUID NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
+  question_text TEXT NOT NULL,
+  answer_options JSONB NOT NULL,
+  correct_answer TEXT NOT NULL,
+  explanation TEXT,
+  sort_order INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS quiz_attempts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  quiz_id UUID NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
+  score_percent NUMERIC(5, 2) NOT NULL,
+  answers JSONB NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS lesson_progress (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  lesson_id UUID NOT NULL REFERENCES lessons(id) ON DELETE CASCADE,
+  status VARCHAR(20) NOT NULL DEFAULT 'NOT_STARTED',
+  completed_at TIMESTAMP,
+  UNIQUE (user_id, lesson_id)
+);
+
+CREATE TABLE IF NOT EXISTS learning_events (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  event_type VARCHAR(60) NOT NULL,
+  severity VARCHAR(20) NOT NULL DEFAULT 'INFO',
+  metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS learning_recommendations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  lesson_id UUID REFERENCES lessons(id) ON DELETE SET NULL,
+  recommendation_type VARCHAR(60) NOT NULL,
+  reason TEXT NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS strategies (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name VARCHAR(150) NOT NULL,
+  symbol VARCHAR(20) NOT NULL,
+  quote VARCHAR(20) NOT NULL DEFAULT 'USDT',
+  timeframe VARCHAR(20) NOT NULL,
+  config JSONB NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS backtest_results (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  strategy_id UUID NOT NULL REFERENCES strategies(id) ON DELETE CASCADE,
+  total_return NUMERIC(10, 2) NOT NULL,
+  win_rate NUMERIC(10, 2) NOT NULL,
+  max_drawdown NUMERIC(10, 2) NOT NULL,
+  trade_count INTEGER NOT NULL,
+  result_payload JSONB NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

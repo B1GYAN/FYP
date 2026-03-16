@@ -1,13 +1,19 @@
 // src/layout/MainLayout.js
 import { NavLink } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 export default function MainLayout({ children }) {
+  const { user, logout } = useAuth();
+
   return (
     <div className="app-shell">
       {/* Top header */}
       <header className="app-header">
         <div className="app-logo">PaperTrade</div>
         <div className="app-header-info">
+          <span>
+            Welcome, <strong>{user?.fullName || "Trader"}</strong>
+          </span>
           <span>
             Equity: <strong>$10,000</strong>
           </span>
@@ -16,6 +22,9 @@ export default function MainLayout({ children }) {
             <strong className="text-green">+$250</strong>
           </span>
           <span className="text-muted">Simulated Account</span>
+          <button className="header-button" onClick={logout}>
+            Logout
+          </button>
         </div>
       </header>
 

@@ -1,8 +1,43 @@
-// src/pages/Dashboard.js
 import MainLayout from "../layout/MainLayout";
 import StatCard from "../components/StatCard";
+import LoadingCard from "../components/LoadingCard";
+import { useAuth } from "../context/AuthContext";
+import { apiRequest } from "../config/apiClient";
+import useAsyncData from "../hooks/useAsyncData";
+import { formatCurrency, formatPercent } from "../utils/formatters";
 
 export default function Dashboard() {
+  const { token } = useAuth();
+  const { data, loading, error } = useAsyncData(async () => {
+    const [portfolio, transactions] = await Promise.all([
+      apiRequest("/api/portfolio", { token }),
+      apiRequest("/api/portfolio/transactions", { token }),
+    ]);
+
+    return { portfolio, transactions };
+  }, [token]);
+
+  if (loading) {
+    return (
+      <MainLayout>
+        <LoadingCard text="Loading portfolio dashboard..." />
+      </MainLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <MainLayout>
+        <div className="card" style={{ color: "#fecaca" }}>
+          {error}
+        </div>
+      </MainLayout>
+    );
+  }
+
+  const portfolio = data?.portfolio;
+  const transactions = data?.transactions || [];
+
   return (
     <MainLayout>
       <h1 className="page-title">Dashboard — Portfolio Overview</h1>
@@ -11,7 +46,6 @@ export default function Dashboard() {
         recent trades.
       </p>
 
-      {/* Top stats row */}
       <div
         style={{
           display: "grid",
@@ -22,18 +56,25 @@ export default function Dashboard() {
       >
         <StatCard
           label="Account Equity"
-          value="$10,000"
-          note="+$250 today"
+          value={formatCurrency(portfolio.equityValue)}
+          note={`${formatCurrency(portfolio.cashBalance)} cash`}
         />
-        <StatCard label="Open P/L" value="+$120" note="+1.2%" />
         <StatCard
-          label="Win Rate"
-          value="58%"
-          note="Last 30 simulated trades"
+          label="Open P/L"
+          value={formatCurrency(portfolio.unrealizedPl)}
+          note={formatPercent(
+            portfolio.equityValue
+              ? (portfolio.unrealizedPl / portfolio.equityValue) * 100
+              : 0
+          )}
+        />
+        <StatCard
+          label="Realized P/L"
+          value={formatCurrency(portfolio.realizedPl)}
+          note={`${portfolio.holdings.length} open holdings`}
         />
       </div>
 
-      {/* Lower section: positions + trades + chart */}
       <div
         style={{
           display: "grid",
@@ -41,7 +82,6 @@ export default function Dashboard() {
           gap: "16px",
         }}
       >
-        {/* Open Positions */}
         <div className="card">
           <h2>Open Positions</h2>
           <table className="table">
@@ -55,25 +95,34 @@ export default function Dashboard() {
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <td>AAPL</td>
-                <td>10</td>
-                <td>$180.00</td>
-                <td>$185.50</td>
-                <td className="text-green">+$55</td>
-              </tr>
-              <tr>
-                <td>TSLA</td>
-                <td>5</td>
-                <td>$240.00</td>
-                <td>$235.20</td>
-                <td className="text-red">-$24</td>
-              </tr>
+              {portfolio.holdings.length === 0 ? (
+                <tr>
+                  <td colSpan="5" className="text-muted">
+                    No open positions yet. Place a trade to start building your
+                    portfolio.
+                  </td>
+                </tr>
+              ) : (
+                portfolio.holdings.map((holding) => (
+                  <tr key={holding.id}>
+                    <td>{holding.pair}</td>
+                    <td>{holding.quantity}</td>
+                    <td>{formatCurrency(holding.averagePrice, 4)}</td>
+                    <td>{formatCurrency(holding.currentPrice, 4)}</td>
+                    <td
+                      className={
+                        holding.unrealizedPl >= 0 ? "text-green" : "text-red"
+                      }
+                    >
+                      {formatCurrency(holding.unrealizedPl)}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
 
-        {/* Right side: recent trades + chart placeholder */}
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
           <div className="card">
             <h2>Recent Trades</h2>
@@ -85,9 +134,16 @@ export default function Dashboard() {
                 lineHeight: 1.6,
               }}
             >
-              <li>BUY 10 AAPL @ 180.00 — Simulated</li>
-              <li>SELL 5 TSLA @ 235.20 — Simulated</li>
-              <li>BUY 2 MSFT @ 420.00 — Simulated</li>
+              {transactions.length === 0 ? (
+                <li>No trades executed yet.</li>
+              ) : (
+                transactions.slice(0, 5).map((trade) => (
+                  <li key={trade.id}>
+                    {trade.side} {trade.quantity} {trade.pair} @{" "}
+                    {formatCurrency(trade.price, 4)}
+                  </li>
+                ))
+              )}
             </ul>
           </div>
 
@@ -102,7 +158,7 @@ export default function Dashboard() {
               fontSize: "13px",
             }}
           >
-            Performance chart placeholder (equity curve)
+            Active positions value: {formatCurrency(portfolio.positionsValue)}
           </div>
         </div>
       </div>
