@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import MainLayout from "../layout/MainLayout";
 import LoadingCard from "../components/LoadingCard";
 import { apiRequest } from "../config/apiClient";
@@ -7,65 +8,13 @@ import useAsyncData from "../hooks/useAsyncData";
 
 export default function Learning() {
   const { token } = useAuth();
-  const [selectedQuiz, setSelectedQuiz] = useState(null);
-  const [answers, setAnswers] = useState({});
-  const [quizResult, setQuizResult] = useState(null);
-  const { data, setData, loading, error } = useAsyncData(
+  const navigate = useNavigate();
+  const { data, loading, error } = useAsyncData(
     async () => apiRequest("/api/learn/dashboard", { token }),
     [token]
   );
 
-  async function toggleComplete(lesson) {
-    const nextStatus =
-      lesson.status === "COMPLETED" ? "IN_PROGRESS" : "COMPLETED";
-
-    await apiRequest(`/api/learn/lessons/${lesson.id}/progress`, {
-      token,
-      method: "PATCH",
-      body: JSON.stringify({ status: nextStatus }),
-    });
-
-    setData((prev) => {
-      const lessons = prev.lessons.map((item) =>
-        item.id === lesson.id ? { ...item, status: nextStatus } : item
-      );
-      const completedLessons = lessons.filter(
-        (item) => item.status === "COMPLETED"
-      ).length;
-
-      return {
-        ...prev,
-        lessons,
-        progress: {
-          totalLessons: lessons.length,
-          completedLessons,
-          completionRate: lessons.length
-            ? Number(((completedLessons / lessons.length) * 100).toFixed(2))
-            : 0,
-        },
-      };
-    });
-  }
-
-  async function openQuiz(quizId) {
-    const quiz = await apiRequest(`/api/learn/quizzes/${quizId}`, { token });
-    setSelectedQuiz(quiz);
-    setAnswers({});
-    setQuizResult(null);
-  }
-
-  async function submitQuiz() {
-    const result = await apiRequest(
-      `/api/learn/quizzes/${selectedQuiz.id}/attempts`,
-      {
-        token,
-        method: "POST",
-        body: JSON.stringify({ answers }),
-      }
-    );
-
-    setQuizResult(result);
-  }
+  const lessons = useMemo(() => data?.lessons || [], [data]);
 
   if (loading) {
     return (
@@ -85,15 +34,13 @@ export default function Learning() {
     );
   }
 
-  const lessons = data.lessons;
   const progress = Math.round(data.progress.completionRate);
 
   return (
     <MainLayout>
-      <h1 className="page-title">Learning Module — Lessons & Quizzes</h1>
+      <h1 className="page-title">Learning Module - Classes</h1>
       <p className="page-subtitle">
-        Structured learning content adapts to trading behavior and reinforces
-        risk management discipline.
+        Open a class to view its full contents on a separate page, then complete it to unlock the quiz.
       </p>
 
       <div className="card" style={{ marginBottom: 16 }}>
@@ -141,125 +88,98 @@ export default function Learning() {
       </div>
 
       <div className="card">
-        <h2>Lesson Library</h2>
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Lesson</th>
-              <th>Level</th>
-              <th>Status</th>
-              <th>Progress</th>
-              <th>Quiz</th>
-            </tr>
-          </thead>
-          <tbody>
-            {lessons.map((lesson) => (
-              <tr key={lesson.id}>
-                <td>
-                  <div>{lesson.title}</div>
-                  <div className="text-muted" style={{ fontSize: 11 }}>
+        <h2>Class Library</h2>
+        <div style={{ display: "grid", gap: 14 }}>
+          {lessons.map((lesson, index) => (
+            <div
+              key={lesson.id}
+              style={{
+                border: "1px solid #1f2937",
+                borderRadius: 14,
+                background: "#0f172a",
+                padding: 16,
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  gap: 16,
+                  flexWrap: "wrap",
+                }}
+              >
+                <div style={{ flex: 1, minWidth: 220 }}>
+                  <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 6 }}>
+                    Class {index + 1} • {lesson.category} • {lesson.level}
+                  </div>
+                  <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 8 }}>
+                    {lesson.title}
+                  </div>
+                  <div style={{ fontSize: 13, color: "#94a3b8", lineHeight: 1.6 }}>
                     {lesson.summary}
                   </div>
-                </td>
-                <td>{lesson.level}</td>
-                <td>{lesson.status.replace("_", " ")}</td>
-                <td>
-                  <button
-                    onClick={() => toggleComplete(lesson)}
-                    style={lessonButtonStyle(lesson.status === "COMPLETED")}
-                  >
-                    {lesson.status === "COMPLETED"
-                      ? "Mark Incomplete"
-                      : "Mark Complete"}
-                  </button>
-                </td>
-                <td>
-                  {lesson.quizId ? (
-                    <button
-                      onClick={() => openQuiz(lesson.quizId)}
-                      style={secondaryButtonStyle}
-                    >
-                      Open Quiz
-                    </button>
-                  ) : (
-                    <span className="text-muted">No quiz</span>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                </div>
 
-      {selectedQuiz ? (
-        <div className="card mt-16">
-          <h2>{selectedQuiz.title}</h2>
-          {selectedQuiz.questions.map((question) => (
-            <div key={question.id} style={{ marginBottom: 16 }}>
-              <div style={{ marginBottom: 8, fontSize: 14 }}>
-                {question.questionText}
-              </div>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                {question.answerOptions.map((option) => (
+                <div style={{ minWidth: 220, display: "flex", flexDirection: "column", gap: 10 }}>
+                  <div style={statusBadgeStyle(lesson.status)}>
+                    {lesson.status.replace("_", " ")}
+                  </div>
                   <button
-                    key={option}
-                    onClick={() =>
-                      setAnswers((prev) => ({
-                        ...prev,
-                        [question.id]: option,
-                      }))
-                    }
-                    style={{
-                      ...secondaryButtonStyle,
-                      border:
-                        answers[question.id] === option
-                          ? "1px solid #7c3aed"
-                          : "1px solid #374151",
-                      background:
-                        answers[question.id] === option ? "#2a1e45" : "transparent",
-                    }}
+                    type="button"
+                    onClick={() => navigate(`/learn/lessons/${lesson.id}`)}
+                    style={openClassButtonStyle}
                   >
-                    {option}
+                    Open Class Content
                   </button>
-                ))}
+                  <div style={{ fontSize: 12, color: "#64748b" }}>
+                    {lesson.estimatedMinutes} min • Quiz {lesson.quizUnlocked ? "unlocked" : "locked"}
+                  </div>
+                </div>
               </div>
             </div>
           ))}
-
-          <button className="auth-button" onClick={submitQuiz}>
-            Submit Quiz
-          </button>
-
-          {quizResult ? (
-            <p style={{ marginTop: 12, fontSize: 13 }}>
-              Score: <strong>{quizResult.scorePercent}%</strong> (
-              {quizResult.correctCount}/{quizResult.totalQuestions})
-            </p>
-          ) : null}
         </div>
-      ) : null}
+      </div>
     </MainLayout>
   );
 }
 
-function lessonButtonStyle(isComplete) {
+function statusBadgeStyle(status) {
+  const map = {
+    COMPLETED: {
+      background: "rgba(34, 197, 94, 0.15)",
+      color: "#86efac",
+    },
+    IN_PROGRESS: {
+      background: "rgba(245, 158, 11, 0.16)",
+      color: "#fcd34d",
+    },
+    NOT_STARTED: {
+      background: "rgba(71, 85, 105, 0.25)",
+      color: "#cbd5e1",
+    },
+  };
+
+  const colors = map[status] || map.NOT_STARTED;
+
   return {
+    display: "inline-block",
+    width: "fit-content",
     padding: "6px 10px",
-    borderRadius: 6,
-    border: "none",
-    cursor: "pointer",
-    background: isComplete ? "#4b5563" : "#7c3aed",
-    color: "#f9fafb",
-    fontSize: 12,
+    borderRadius: 999,
+    fontSize: 11,
+    fontWeight: 700,
+    background: colors.background,
+    color: colors.color,
   };
 }
 
-const secondaryButtonStyle = {
-  padding: "6px 10px",
-  borderRadius: 6,
-  border: "1px solid #312949",
+const openClassButtonStyle = {
+  padding: "11px 14px",
+  borderRadius: 12,
+  border: "1px solid #1e3a8a",
   cursor: "pointer",
-  background: "transparent",
-  color: "#f9fafb",
-  fontSize: 12,
+  background: "linear-gradient(135deg, #0ea5e9, #2563eb)",
+  color: "#f8fafc",
+  fontWeight: 700,
 };

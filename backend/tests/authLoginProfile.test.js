@@ -12,6 +12,7 @@ const jwt = require("jsonwebtoken");
 const request = require("supertest");
 const db = require("../db");
 const app = require("../src/app");
+const env = require("../src/config/env");
 
 describe("auth login and profile flow", () => {
   beforeEach(() => {
@@ -45,7 +46,7 @@ describe("auth login and profile flow", () => {
   test("returns current user profile for valid token", async () => {
     const token = jwt.sign(
       { sub: "user-1", email: "bigyan@example.com" },
-      "papertrade-dev-secret"
+      env.jwtSecret
     );
 
     db.query

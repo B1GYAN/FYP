@@ -38,6 +38,7 @@ async function listLessons(userId) {
     quizId: row.quiz_id,
     status: row.status || "NOT_STARTED",
     completedAt: row.completed_at,
+    quizUnlocked: (row.status || "NOT_STARTED") === "COMPLETED",
   }));
 }
 
@@ -59,6 +60,31 @@ async function markLessonProgress(userId, lessonId, status) {
   return { success: true };
 }
 
+async function getLessonStatusForQuiz(userId, quizId) {
+  const result = await db.query(
+    `
+      SELECT
+        q.id,
+        q.lesson_id,
+        COALESCE(lp.status, 'NOT_STARTED') AS lesson_status
+      FROM quizzes q
+      LEFT JOIN lesson_progress lp
+        ON lp.lesson_id = q.lesson_id
+       AND lp.user_id = $1
+      WHERE q.id = $2
+    `,
+    [userId, quizId]
+  );
+
+  if (result.rowCount === 0) {
+    const error = new Error("Quiz not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  return result.rows[0];
+}
+
 async function listQuizzesForLesson(lessonId) {
   const result = await db.query(
     `
@@ -73,7 +99,15 @@ async function listQuizzesForLesson(lessonId) {
   return result.rows;
 }
 
-async function getQuiz(quizId) {
+async function getQuiz(userId, quizId) {
+  const lessonStatus = await getLessonStatusForQuiz(userId, quizId);
+
+  if (lessonStatus.lesson_status !== "COMPLETED") {
+    const error = new Error("Complete the lesson content before opening this quiz");
+    error.statusCode = 403;
+    throw error;
+  }
+
   const quizResult = await db.query(
     `
       SELECT id, lesson_id, title
@@ -113,7 +147,7 @@ async function getQuiz(quizId) {
 }
 
 async function submitQuizAttempt(userId, quizId, answers) {
-  const quiz = await getQuiz(quizId);
+  const quiz = await getQuiz(userId, quizId);
   const answerMap = answers || {};
   let correctCount = 0;
 

@@ -9,6 +9,7 @@ import Trading from "./pages/Trading";
 import Watchlist from "./pages/Watchlist";
 import Charts from "./pages/Charts";
 import Learning from "./pages/Learning";
+import LessonDetail from "./pages/LessonDetail";
 import StrategyLab from "./pages/StrategyLab";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -71,6 +72,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <Learning />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/learn/lessons/:lessonId"
+            element={
+              <ProtectedRoute>
+                <LessonDetail />
               </ProtectedRoute>
             }
           />

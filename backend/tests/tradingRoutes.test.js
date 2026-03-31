@@ -32,6 +32,7 @@ const jwt = require("jsonwebtoken");
 const request = require("supertest");
 const db = require("../db");
 const app = require("../src/app");
+const env = require("../src/config/env");
 
 describe("trading routes", () => {
   beforeEach(() => {
@@ -41,7 +42,7 @@ describe("trading routes", () => {
   test("places an authenticated order", async () => {
     const token = jwt.sign(
       { sub: "user-1", email: "bigyan@example.com" },
-      "papertrade-dev-secret"
+      env.jwtSecret
     );
 
     db.query.mockResolvedValueOnce({

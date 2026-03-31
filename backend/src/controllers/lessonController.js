@@ -15,7 +15,7 @@ const updateLessonProgress = asyncHandler(async (req, res) => {
 
 const getQuiz = asyncHandler(async (req, res) => {
   try {
-    const quiz = await lessonService.getQuiz(req.params.quizId);
+    const quiz = await lessonService.getQuiz(req.user.id, req.params.quizId);
     res.json(quiz);
   } catch (error) {
     if (error.statusCode) {

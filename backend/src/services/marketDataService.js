@@ -1,8 +1,8 @@
 const db = require("../../db");
 const { getJson } = require("../utils/http");
 
-const MARKET_CACHE_TTL_MS = 30 * 1000;
-const HISTORY_CACHE_TTL_MS = 5 * 60 * 1000;
+const MARKET_CACHE_TTL_MS = 5000;
+const HISTORY_CACHE_TTL_MS = 5000;
 
 const currentPriceCache = new Map();
 const historicalCache = new Map();
