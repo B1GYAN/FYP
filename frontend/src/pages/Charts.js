@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import MainLayout from "../layout/MainLayout";
 import LoadingCard from "../components/LoadingCard";
+import CandlestickChart from "../components/CandlestickChart";
 import { apiRequest } from "../config/apiClient";
 import { formatCurrency, formatPercent } from "../utils/formatters";
 
@@ -101,6 +102,19 @@ export default function Charts() {
   const rangeMovePercent = earliestCandle?.open
     ? (rangeMove / earliestCandle.open) * 100
     : 0;
+
+  const openFullscreenChart = () => {
+    const query = new URLSearchParams({
+      pair: selectedPair,
+      timeframe,
+    });
+
+    window.open(
+      `/charts/window?${query.toString()}`,
+      "papertrade-chart-window",
+      "noopener,noreferrer,width=1440,height=900"
+    );
+  };
 
   return (
     <MainLayout>
@@ -264,6 +278,13 @@ export default function Charts() {
           </div>
 
           <div style={{ textAlign: "right" }}>
+            <button
+              type="button"
+              onClick={openFullscreenChart}
+              style={fullscreenButtonStyle}
+            >
+              Open Full Screen View
+            </button>
             <div
               style={{
                 display: "inline-flex",
@@ -275,6 +296,7 @@ export default function Charts() {
                 border: "1px solid #1e3a8a",
                 color: "#bfdbfe",
                 fontSize: 12,
+                marginTop: 12,
               }}
             >
               <span
@@ -367,169 +389,6 @@ function MetricCard({ label, value, note, accent }) {
   );
 }
 
-function CandlestickChart({ candles, timeframe }) {
-  const width = 960;
-  const height = 380;
-  const padding = 34;
-
-  if (!candles.length) {
-    return (
-      <div
-        style={{
-          minHeight: 320,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          color: "#94a3b8",
-          fontSize: 13,
-        }}
-      >
-        No chart data available.
-      </div>
-    );
-  }
-
-  const highs = candles.map((candle) => candle.high);
-  const lows = candles.map((candle) => candle.low);
-  const maxPrice = Math.max(...highs);
-  const minPrice = Math.min(...lows);
-  const range = Math.max(maxPrice - minPrice, 0.0001);
-  const chartWidth = width - padding * 2;
-  const chartHeight = height - padding * 2;
-  const candleWidth = Math.max((chartWidth / candles.length) * 0.58, 4);
-  const step = chartWidth / Math.max(candles.length, 1);
-
-  const toY = (value) => padding + ((maxPrice - value) / range) * chartHeight;
-  const gridValues = Array.from({ length: 5 }, (_, index) => {
-    const value = maxPrice - (range / 4) * index;
-    const y = padding + (chartHeight / 4) * index;
-    return { value, y };
-  });
-  const labelStep = Math.max(Math.floor(candles.length / 6), 1);
-
-  return (
-    <div style={{ width: "100%", overflowX: "auto" }}>
-      <svg
-        viewBox={`0 0 ${width} ${height}`}
-        style={{
-          width: "100%",
-          minWidth: 720,
-          height: "auto",
-          display: "block",
-          borderRadius: 16,
-          background:
-            "radial-gradient(circle at top, rgba(14, 165, 233, 0.12), rgba(2, 6, 23, 0.98) 62%)",
-        }}
-        role="img"
-        aria-label={`${timeframe} candlestick chart`}
-      >
-        {gridValues.map((grid) => (
-          <g key={grid.y}>
-            <line
-              x1={padding}
-              y1={grid.y}
-              x2={width - padding}
-              y2={grid.y}
-              stroke="rgba(148, 163, 184, 0.14)"
-              strokeDasharray="4 8"
-            />
-            <text
-              x={width - padding + 8}
-              y={grid.y + 4}
-              fill="#94a3b8"
-              fontSize="11"
-            >
-              {formatCurrency(grid.value, 4)}
-            </text>
-          </g>
-        ))}
-
-        {candles.map((candle, index) => {
-          const xCenter = padding + step * index + step / 2;
-          const openY = toY(candle.open);
-          const closeY = toY(candle.close);
-          const highY = toY(candle.high);
-          const lowY = toY(candle.low);
-          const isUp = candle.close >= candle.open;
-          const bodyTop = Math.min(openY, closeY);
-          const bodyHeight = Math.max(Math.abs(closeY - openY), 2);
-          const color = isUp ? "#22c55e" : "#f87171";
-
-          return (
-            <g key={candle.time}>
-              <line
-                x1={xCenter}
-                y1={highY}
-                x2={xCenter}
-                y2={lowY}
-                stroke={color}
-                strokeWidth="1.6"
-              />
-              <rect
-                x={xCenter - candleWidth / 2}
-                y={bodyTop}
-                width={candleWidth}
-                height={bodyHeight}
-                rx="1.5"
-                fill={isUp ? "rgba(34, 197, 94, 0.32)" : "rgba(248, 113, 113, 0.32)"}
-                stroke={color}
-                strokeWidth="1.5"
-              />
-            </g>
-          );
-        })}
-
-        {candles.map((candle, index) =>
-          index % labelStep === 0 || index === candles.length - 1 ? (
-            <g key={`${candle.time}-label`}>
-              <line
-                x1={padding + step * index + step / 2}
-                y1={padding}
-                x2={padding + step * index + step / 2}
-                y2={height - padding}
-                stroke="rgba(30, 41, 59, 0.3)"
-              />
-              <text
-                x={padding + step * index + step / 2}
-                y={height - 8}
-                textAnchor="middle"
-                fill="#94a3b8"
-                fontSize="11"
-              >
-                {formatAxisLabel(candle.time, timeframe)}
-              </text>
-            </g>
-          ) : null
-        )}
-      </svg>
-    </div>
-  );
-}
-
-function formatAxisLabel(time, timeframe) {
-  const date = new Date(time);
-
-  if (timeframe === "1D") {
-    return date.toLocaleDateString([], {
-      month: "short",
-      day: "numeric",
-    });
-  }
-
-  if (timeframe === "4H") {
-    return date.toLocaleString([], {
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-    });
-  }
-
-  return date.toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
 function formatExactLabel(time, timeframe) {
   const date = new Date(time);
 
@@ -557,4 +416,14 @@ const controlStyle = {
   border: "1px solid #1f2937",
   background: "#111827",
   color: "#f9fafb",
+};
+
+const fullscreenButtonStyle = {
+  padding: "10px 14px",
+  borderRadius: 12,
+  border: "1px solid #38bdf8",
+  background: "rgba(14, 165, 233, 0.12)",
+  color: "#e0f2fe",
+  cursor: "pointer",
+  fontWeight: 700,
 };

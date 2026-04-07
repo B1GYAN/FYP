@@ -183,6 +183,29 @@ async function getHistoricalCandles(symbol, quote = "USDT", timeframe = "1H") {
   }
 }
 
+function mergeLiveTickerIntoCandles(candles, ticker) {
+  if (!Array.isArray(candles) || candles.length === 0 || !ticker) {
+    return candles;
+  }
+
+  const latestPrice = Number(ticker.price);
+
+  if (!Number.isFinite(latestPrice) || latestPrice <= 0) {
+    return candles;
+  }
+
+  const lastIndex = candles.length - 1;
+  const lastCandle = candles[lastIndex];
+  const nextLastCandle = {
+    ...lastCandle,
+    close: latestPrice,
+    high: Math.max(Number(lastCandle.high), latestPrice),
+    low: Math.min(Number(lastCandle.low), latestPrice),
+  };
+
+  return [...candles.slice(0, lastIndex), nextLastCandle];
+}
+
 async function listSupportedAssets() {
   const result = await db.query(
     `
@@ -224,6 +247,7 @@ module.exports = {
   getTickerForPair,
   enrichPairs,
   getHistoricalCandles,
+  mergeLiveTickerIntoCandles,
   listSupportedAssets,
   getMarketOverview,
 };
