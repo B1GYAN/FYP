@@ -8,6 +8,7 @@ import Dashboard from "./pages/Dashboard";
 import Trading from "./pages/Trading";
 import Watchlist from "./pages/Watchlist";
 import Charts from "./pages/Charts";
+import ChartFullscreen from "./pages/ChartFullscreen";
 import Learning from "./pages/Learning";
 import LessonDetail from "./pages/LessonDetail";
 import StrategyLab from "./pages/StrategyLab";
@@ -64,6 +65,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <Charts />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/charts/window"
+            element={
+              <ProtectedRoute>
+                <ChartFullscreen />
               </ProtectedRoute>
             }
           />
