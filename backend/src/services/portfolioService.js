@@ -35,7 +35,7 @@ async function getUserHoldings(userId) {
         h.average_price
       FROM holdings h
       INNER JOIN portfolios p ON p.id = h.portfolio_id
-      WHERE p.user_id = $1 AND h.quantity > 0
+      WHERE p.user_id = $1 AND h.quantity <> 0
       ORDER BY h.symbol
     `,
     [userId]
@@ -45,6 +45,7 @@ async function getUserHoldings(userId) {
     result.rows.map(async (row) => {
       const ticker = await marketDataService.getTickerForPair(row.symbol, row.quote);
       const quantity = Number(row.quantity);
+      const absoluteQuantity = Math.abs(quantity);
       const averagePrice = Number(row.average_price);
       const currentPrice = Number(ticker.price);
       const marketValue = quantity * currentPrice;
@@ -56,9 +57,12 @@ async function getUserHoldings(userId) {
         symbol: row.symbol,
         quote: row.quote,
         quantity,
+        absoluteQuantity,
+        direction: quantity >= 0 ? "LONG" : "SHORT",
         averagePrice,
         currentPrice,
         marketValue: roundCurrency(marketValue),
+        exposureValue: roundCurrency(absoluteQuantity * currentPrice),
         unrealizedPl: roundCurrency(unrealizedPl),
         changePercent: Number(ticker.changePercent.toFixed(2)),
       };

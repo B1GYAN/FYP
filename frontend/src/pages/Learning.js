@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import MainLayout from "../layout/MainLayout";
 import LoadingCard from "../components/LoadingCard";
@@ -9,10 +9,11 @@ import useAsyncData from "../hooks/useAsyncData";
 export default function Learning() {
   const { token } = useAuth();
   const navigate = useNavigate();
-  const { data, loading, error } = useAsyncData(
+  const loadLearningDashboard = useCallback(
     async () => apiRequest("/api/learn/dashboard", { token }),
     [token]
   );
+  const { data, loading, error } = useAsyncData(loadLearningDashboard);
 
   const lessons = useMemo(() => data?.lessons || [], [data]);
 
@@ -110,7 +111,7 @@ export default function Learning() {
               >
                 <div style={{ flex: 1, minWidth: 220 }}>
                   <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 6 }}>
-                    Class {index + 1} • {lesson.category} • {lesson.level}
+                    Class {index + 1} - {lesson.category} - {lesson.level}
                   </div>
                   <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 8 }}>
                     {lesson.title}
@@ -132,7 +133,7 @@ export default function Learning() {
                     Open Class Content
                   </button>
                   <div style={{ fontSize: 12, color: "#64748b" }}>
-                    {lesson.estimatedMinutes} min • Quiz {lesson.quizUnlocked ? "unlocked" : "locked"}
+                    {lesson.estimatedMinutes} min - Quiz {lesson.quizUnlocked ? "unlocked" : "locked"}
                   </div>
                 </div>
               </div>

@@ -28,6 +28,7 @@ describe("auth login and profile flow", () => {
           full_name: "Bigyan Lama",
           email: "bigyan@example.com",
           password_hash: "hashed-password",
+          subscription_tier: "PREMIUM",
           created_at: "2026-01-01T00:00:00.000Z",
         },
       ],
@@ -53,13 +54,14 @@ describe("auth login and profile flow", () => {
       .mockResolvedValueOnce({
         rowCount: 1,
         rows: [
-          {
-            id: "user-1",
-            full_name: "Bigyan Lama",
-            email: "bigyan@example.com",
-            created_at: "2026-01-01T00:00:00.000Z",
-          },
-        ],
+        {
+          id: "user-1",
+          full_name: "Bigyan Lama",
+          email: "bigyan@example.com",
+          subscription_tier: "PREMIUM",
+          created_at: "2026-01-01T00:00:00.000Z",
+        },
+      ],
       })
       .mockResolvedValueOnce({
         rowCount: 1,
@@ -68,6 +70,7 @@ describe("auth login and profile flow", () => {
             id: "user-1",
             full_name: "Bigyan Lama",
             email: "bigyan@example.com",
+            subscription_tier: "PREMIUM",
             created_at: "2026-01-01T00:00:00.000Z",
             cash_balance: 10000,
             equity_value: 10250,
@@ -83,5 +86,6 @@ describe("auth login and profile flow", () => {
     expect(response.statusCode).toBe(200);
     expect(response.body.email).toBe("bigyan@example.com");
     expect(response.body.portfolio.equityValue).toBe(10250);
+    expect(response.body.isPremium).toBe(true);
   });
 });

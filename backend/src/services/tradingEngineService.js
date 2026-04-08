@@ -112,6 +112,39 @@ async function createOrderRecord(client, userId, portfolioId, order) {
   return result.rows[0];
 }
 
+function upsertHolding(client, holdingId, nextQuantity, averagePrice) {
+  if (Math.abs(nextQuantity) < 1e-8) {
+    return client.query(`DELETE FROM holdings WHERE id = $1`, [holdingId]);
+  }
+
+  return client.query(
+    `
+      UPDATE holdings
+      SET quantity = $2,
+          average_price = $3,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = $1
+    `,
+    [holdingId, nextQuantity, averagePrice]
+  );
+}
+
+function createHolding(client, portfolioId, symbol, quote, quantity, averagePrice) {
+  return client.query(
+    `
+      INSERT INTO holdings (
+        portfolio_id,
+        symbol,
+        quote,
+        quantity,
+        average_price
+      )
+      VALUES ($1, $2, $3, $4, $5)
+    `,
+    [portfolioId, symbol, quote, quantity, averagePrice]
+  );
+}
+
 async function placeOrder(userId, payload) {
   const order = parseOrderInput(payload);
   const client = await db.getClient();
@@ -139,6 +172,9 @@ async function placeOrder(userId, payload) {
     let realizedPl = 0;
     let nextCashBalance = Number(portfolio.cash_balance);
 
+    const currentQty = holding ? Number(holding.quantity) : 0;
+    const currentAvg = holding ? Number(holding.average_price) : 0;
+
     if (order.side === "BUY") {
       if (nextCashBalance < orderValue) {
         const error = new Error("Insufficient virtual cash balance");
@@ -149,61 +185,71 @@ async function placeOrder(userId, payload) {
       nextCashBalance -= orderValue;
 
       if (!holding) {
-        await client.query(
-          `
-            INSERT INTO holdings (
-              portfolio_id,
-              symbol,
-              quote,
-              quantity,
-              average_price
-            )
-            VALUES ($1, $2, $3, $4, $5)
-          `,
-          [portfolioId, order.symbol, order.quote, order.quantity, executedPrice]
+        await createHolding(
+          client,
+          portfolioId,
+          order.symbol,
+          order.quote,
+          order.quantity,
+          executedPrice
         );
-      } else {
-        const existingQty = Number(holding.quantity);
-        const existingAvg = Number(holding.average_price);
-        const newQty = existingQty + order.quantity;
+      } else if (currentQty >= 0) {
+        const newQty = currentQty + order.quantity;
         const newAveragePrice =
-          (existingQty * existingAvg + order.quantity * executedPrice) / newQty;
+          (currentQty * currentAvg + order.quantity * executedPrice) / newQty;
 
-        await client.query(
-          `
-            UPDATE holdings
-            SET quantity = $2,
-                average_price = $3,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE id = $1
-          `,
-          [holding.id, newQty, newAveragePrice]
-        );
+        await upsertHolding(client, holding.id, newQty, newAveragePrice);
+      } else {
+        const shortQty = Math.abs(currentQty);
+        const coverQty = Math.min(order.quantity, shortQty);
+        const remainingOrderQty = order.quantity - coverQty;
+        const nextQuantity = currentQty + order.quantity;
+
+        realizedPl = (currentAvg - executedPrice) * coverQty;
+
+        if (Math.abs(nextQuantity) < 1e-8) {
+          await client.query(`DELETE FROM holdings WHERE id = $1`, [holding.id]);
+        } else if (nextQuantity < 0) {
+          await upsertHolding(client, holding.id, nextQuantity, currentAvg);
+        } else {
+          const nextAveragePrice = remainingOrderQty > 0 ? executedPrice : currentAvg;
+          await upsertHolding(client, holding.id, nextQuantity, nextAveragePrice);
+        }
       }
     } else {
-      const currentQty = holding ? Number(holding.quantity) : 0;
-
-      if (!holding || currentQty < order.quantity) {
-        const error = new Error("Cannot sell more than the quantity you own");
-        error.statusCode = 400;
-        throw error;
-      }
-
       nextCashBalance += orderValue;
-      realizedPl = (executedPrice - Number(holding.average_price)) * order.quantity;
-      const remainingQty = currentQty - order.quantity;
 
-      if (remainingQty <= 0) {
-        await client.query(`DELETE FROM holdings WHERE id = $1`, [holding.id]);
-      } else {
-        await client.query(
-          `
-            UPDATE holdings
-            SET quantity = $2, updated_at = CURRENT_TIMESTAMP
-            WHERE id = $1
-          `,
-          [holding.id, remainingQty]
+      if (!holding) {
+        await createHolding(
+          client,
+          portfolioId,
+          order.symbol,
+          order.quote,
+          -order.quantity,
+          executedPrice
         );
+      } else if (currentQty <= 0) {
+        const shortQty = Math.abs(currentQty);
+        const newShortQty = shortQty + order.quantity;
+        const newAveragePrice =
+          (shortQty * currentAvg + order.quantity * executedPrice) / newShortQty;
+
+        await upsertHolding(client, holding.id, -newShortQty, newAveragePrice);
+      } else {
+        const closeQty = Math.min(order.quantity, currentQty);
+        const remainingOrderQty = order.quantity - closeQty;
+        const nextQuantity = currentQty - order.quantity;
+
+        realizedPl = (executedPrice - currentAvg) * closeQty;
+
+        if (Math.abs(nextQuantity) < 1e-8) {
+          await client.query(`DELETE FROM holdings WHERE id = $1`, [holding.id]);
+        } else if (nextQuantity > 0) {
+          await upsertHolding(client, holding.id, nextQuantity, currentAvg);
+        } else {
+          const nextAveragePrice = remainingOrderQty > 0 ? executedPrice : currentAvg;
+          await upsertHolding(client, holding.id, nextQuantity, nextAveragePrice);
+        }
       }
     }
 

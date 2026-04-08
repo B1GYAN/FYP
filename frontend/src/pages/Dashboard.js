@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import MainLayout from "../layout/MainLayout";
 import StatCard from "../components/StatCard";
 import LoadingCard from "../components/LoadingCard";
@@ -8,7 +9,7 @@ import { formatCurrency, formatPercent } from "../utils/formatters";
 
 export default function Dashboard() {
   const { token } = useAuth();
-  const { data, loading, error } = useAsyncData(async () => {
+  const loadDashboard = useCallback(async () => {
     const [portfolio, transactions] = await Promise.all([
       apiRequest("/api/portfolio", { token }),
       apiRequest("/api/portfolio/transactions", { token }),
@@ -16,6 +17,7 @@ export default function Dashboard() {
 
     return { portfolio, transactions };
   }, [token]);
+  const { data, loading, error } = useAsyncData(loadDashboard);
 
   if (loading) {
     return (
@@ -40,7 +42,7 @@ export default function Dashboard() {
 
   return (
     <MainLayout>
-      <h1 className="page-title">Dashboard — Portfolio Overview</h1>
+      <h1 className="page-title">Dashboard: Portfolio Overview</h1>
       <p className="page-subtitle">
         High-level view of your simulated account equity, positions, and
         recent trades.
@@ -88,6 +90,7 @@ export default function Dashboard() {
             <thead>
               <tr>
                 <th>Symbol</th>
+                <th>Side</th>
                 <th>Qty</th>
                 <th>Entry</th>
                 <th>Last</th>
@@ -97,7 +100,7 @@ export default function Dashboard() {
             <tbody>
               {portfolio.holdings.length === 0 ? (
                 <tr>
-                  <td colSpan="5" className="text-muted">
+                  <td colSpan="6" className="text-muted">
                     No open positions yet. Place a trade to start building your
                     portfolio.
                   </td>
@@ -106,7 +109,14 @@ export default function Dashboard() {
                 portfolio.holdings.map((holding) => (
                   <tr key={holding.id}>
                     <td>{holding.pair}</td>
-                    <td>{holding.quantity}</td>
+                    <td
+                      className={
+                        holding.direction === "LONG" ? "text-green" : "text-red"
+                      }
+                    >
+                      {holding.direction}
+                    </td>
+                    <td>{holding.absoluteQuantity}</td>
                     <td>{formatCurrency(holding.averagePrice, 4)}</td>
                     <td>{formatCurrency(holding.currentPrice, 4)}</td>
                     <td
