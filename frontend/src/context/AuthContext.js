@@ -19,23 +19,23 @@ function loadStoredAuth() {
 }
 
 export function AuthProvider({ children }) {
-  const initialAuthState = loadStoredAuth();
-  const [authState, setAuthState] = useState(initialAuthState);
+  const [storedSession] = useState(() => loadStoredAuth());
+  const [authState, setAuthState] = useState(storedSession);
   const [isBootstrapping, setIsBootstrapping] = useState(true);
 
   useEffect(() => {
     async function restoreSession() {
-      if (!initialAuthState?.token) {
+      if (!storedSession?.token) {
         setIsBootstrapping(false);
         return;
       }
 
       try {
         const profile = await apiRequest("/api/auth/me", {
-          token: initialAuthState.token,
+          token: storedSession.token,
         });
         const nextState = {
-          token: initialAuthState.token,
+          token: storedSession.token,
           user: profile,
         };
 
@@ -50,7 +50,7 @@ export function AuthProvider({ children }) {
     }
 
     restoreSession();
-  }, []);
+  }, [storedSession]);
 
   async function authenticate(path, payload) {
     const body = await apiRequest(path, {
@@ -78,6 +78,8 @@ export function AuthProvider({ children }) {
     user: authState?.user || null,
     token: authState?.token || null,
     isAuthenticated: Boolean(authState?.token),
+    subscriptionTier: authState?.user?.subscriptionTier || "STANDARD",
+    isPremium: authState?.user?.isPremium || false,
     isBootstrapping,
     register: (payload) => authenticate("/api/auth/register", payload),
     login: (payload) => authenticate("/api/auth/login", payload),

@@ -17,7 +17,7 @@ export default function Login() {
       setSubmitting(true);
       setError("");
       await login({ email, password });
-      navigate("/");
+      navigate("/dashboard");
     } catch (submitError) {
       setError(submitError.message);
     } finally {

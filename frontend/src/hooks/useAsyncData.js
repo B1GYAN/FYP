@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-export default function useAsyncData(loader, dependencies = []) {
+export default function useAsyncData(loader) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -32,7 +32,7 @@ export default function useAsyncData(loader, dependencies = []) {
     return () => {
       active = false;
     };
-  }, dependencies);
+  }, [loader]);
 
   return {
     data,

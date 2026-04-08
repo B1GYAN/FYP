@@ -1,5 +1,6 @@
 const express = require("express");
 const { requireAuth } = require("../middleware/authMiddleware");
+const { requirePremium } = require("../middleware/premiumMiddleware");
 const {
   getLearningDashboard,
   updateLessonProgress,
@@ -10,6 +11,7 @@ const {
 const router = express.Router();
 
 router.use(requireAuth);
+router.use(requirePremium);
 router.get("/dashboard", getLearningDashboard);
 router.patch("/lessons/:lessonId/progress", updateLessonProgress);
 router.get("/quizzes/:quizId", getQuiz);

@@ -17,7 +17,7 @@ const requireAuth = asyncHandler(async (req, res, next) => {
     const payload = jwt.verify(token, env.jwtSecret);
     const result = await db.query(
       `
-        SELECT id, full_name, email, created_at
+        SELECT id, full_name, email, subscription_tier, created_at
         FROM users
         WHERE id = $1
       `,
@@ -29,7 +29,10 @@ const requireAuth = asyncHandler(async (req, res, next) => {
       throw new Error("User no longer exists");
     }
 
-    req.user = result.rows[0];
+    req.user = {
+      ...result.rows[0],
+      subscription_tier: result.rows[0].subscription_tier || "STANDARD",
+    };
     next();
   } catch (error) {
     if (error.name === "JsonWebTokenError" || error.name === "TokenExpiredError") {

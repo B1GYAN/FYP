@@ -3,15 +3,31 @@ const db = require("../../db");
 const { createAccessToken } = require("../utils/jwt");
 
 function sanitizeUser(row) {
+  const subscriptionTier = row.subscription_tier || "STANDARD";
+
   return {
     id: row.id,
     fullName: row.full_name,
     email: row.email,
+    subscriptionTier,
+    isPremium: subscriptionTier === "PREMIUM",
     createdAt: row.created_at,
   };
 }
 
-function validateRegistrationInput({ fullName, email, password }) {
+function normalizeSubscriptionTier(subscriptionTier) {
+  const normalizedTier = String(subscriptionTier || "STANDARD").trim().toUpperCase();
+
+  if (!["STANDARD", "PREMIUM"].includes(normalizedTier)) {
+    const error = new Error("Subscription tier must be STANDARD or PREMIUM");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return normalizedTier;
+}
+
+function validateRegistrationInput({ fullName, email, password, subscriptionTier }) {
   if (!fullName || fullName.trim().length < 2) {
     const error = new Error("Full name must be at least 2 characters");
     error.statusCode = 400;
@@ -29,12 +45,15 @@ function validateRegistrationInput({ fullName, email, password }) {
     error.statusCode = 400;
     throw error;
   }
+
+  normalizeSubscriptionTier(subscriptionTier);
 }
 
-async function registerUser({ fullName, email, password }) {
-  validateRegistrationInput({ fullName, email, password });
+async function registerUser({ fullName, email, password, subscriptionTier }) {
+  validateRegistrationInput({ fullName, email, password, subscriptionTier });
 
   const normalizedEmail = email.trim().toLowerCase();
+  const normalizedTier = normalizeSubscriptionTier(subscriptionTier);
   const client = await db.getClient();
 
   try {
@@ -59,11 +78,11 @@ async function registerUser({ fullName, email, password }) {
 
     const userResult = await client.query(
       `
-        INSERT INTO users (full_name, email, password_hash)
-        VALUES ($1, $2, $3)
-        RETURNING id, full_name, email, starting_balance, created_at
+        INSERT INTO users (full_name, email, password_hash, subscription_tier)
+        VALUES ($1, $2, $3, $4)
+        RETURNING id, full_name, email, starting_balance, subscription_tier, created_at
       `,
-      [fullName.trim(), normalizedEmail, passwordHash]
+      [fullName.trim(), normalizedEmail, passwordHash, normalizedTier]
     );
 
     const user = userResult.rows[0];
@@ -100,7 +119,7 @@ async function loginUser({ email, password }) {
   const normalizedEmail = email.trim().toLowerCase();
   const result = await db.query(
     `
-      SELECT id, full_name, email, password_hash, created_at
+      SELECT id, full_name, email, password_hash, subscription_tier, created_at
       FROM users
       WHERE email = $1
     `,
@@ -135,6 +154,7 @@ async function getUserProfile(userId) {
         u.id,
         u.full_name,
         u.email,
+        u.subscription_tier,
         u.created_at,
         p.cash_balance,
         p.equity_value,
@@ -158,6 +178,8 @@ async function getUserProfile(userId) {
     id: row.id,
     fullName: row.full_name,
     email: row.email,
+    subscriptionTier: row.subscription_tier || "STANDARD",
+    isPremium: (row.subscription_tier || "STANDARD") === "PREMIUM",
     createdAt: row.created_at,
     portfolio: {
       cashBalance: Number(row.cash_balance || 0),
@@ -171,4 +193,5 @@ module.exports = {
   registerUser,
   loginUser,
   getUserProfile,
+  normalizeSubscriptionTier,
 };

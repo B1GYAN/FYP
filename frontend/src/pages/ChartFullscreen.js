@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import LoadingCard from "../components/LoadingCard";
 import CandlestickChart from "../components/CandlestickChart";
 import { apiRequest } from "../config/apiClient";
+import { useAuth } from "../context/AuthContext";
 import { formatCurrency, formatPercent } from "../utils/formatters";
 
 const TIMEFRAME_OPTIONS = ["15M", "1H", "4H", "1D"];
@@ -10,6 +11,7 @@ const REFRESH_INTERVAL_MS = 5000;
 const PAIR_OPTIONS = ["BTC/USDT", "ETH/USDT", "SOL/USDT", "BNB/USDT"];
 
 export default function ChartFullscreen() {
+  const { token } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedPair = searchParams.get("pair") || "BTC/USDT";
   const timeframe = searchParams.get("timeframe") || "1H";
@@ -17,6 +19,16 @@ export default function ChartFullscreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+  const [portfolioData, setPortfolioData] = useState(null);
+  const [tradeError, setTradeError] = useState("");
+  const [tradeSuccess, setTradeSuccess] = useState("");
+  const [submittingTrade, setSubmittingTrade] = useState(false);
+  const [side, setSide] = useState("Buy");
+  const [quantity, setQuantity] = useState(1);
+  const [orderType, setOrderType] = useState("Market");
+  const [limitPrice, setLimitPrice] = useState("");
+  const [stopLoss, setStopLoss] = useState("");
+  const [timeInForce, setTimeInForce] = useState("Day");
   const [visibleCandles, setVisibleCandles] = useState(40);
   const [showPriceLine, setShowPriceLine] = useState(true);
   const [showHighLowGuide, setShowHighLowGuide] = useState(true);
@@ -73,6 +85,40 @@ export default function ChartFullscreen() {
     };
   }, [selectedPair, timeframe]);
 
+  useEffect(() => {
+    let active = true;
+
+    async function loadTradingData() {
+      try {
+        const [portfolio, orders] = await Promise.all([
+          apiRequest("/api/portfolio", { token }),
+          apiRequest("/api/portfolio/orders", { token }),
+        ]);
+
+        if (!active) {
+          return;
+        }
+
+        setPortfolioData({
+          portfolio,
+          orders,
+        });
+      } catch (loadError) {
+        if (!active) {
+          return;
+        }
+
+        setTradeError(loadError.message || "Failed to load trading data");
+      }
+    }
+
+    loadTradingData();
+
+    return () => {
+      active = false;
+    };
+  }, [token]);
+
   const updateQuery = (nextPair, nextTimeframe) => {
     setSearchParams({
       pair: nextPair,
@@ -107,6 +153,56 @@ export default function ChartFullscreen() {
     : 0;
   const visibleSlice = candles.slice(-visibleCandles);
   const visibleLatestCandle = visibleSlice[visibleSlice.length - 1] || latestCandle;
+  const currentPosition = portfolioData?.portfolio?.holdings?.find(
+    (holding) => holding.pair === selectedPair
+  );
+  const recentOrders = (portfolioData?.orders || [])
+    .filter((order) => order.pair === selectedPair)
+    .slice(0, 4);
+  const sideIntent =
+    side === "Buy"
+      ? "Build a long or cover an open short."
+      : "Reduce a long or open and extend a short.";
+
+  async function handleSubmitTrade(event) {
+    event.preventDefault();
+
+    try {
+      setSubmittingTrade(true);
+      setTradeError("");
+      setTradeSuccess("");
+
+      const result = await apiRequest("/api/trading/orders", {
+        token,
+        method: "POST",
+        body: JSON.stringify({
+          side,
+          symbol: selectedPair,
+          quantity: Number(quantity),
+          orderType,
+          limitPrice: orderType === "Limit" ? Number(limitPrice) || null : null,
+          stopLoss: stopLoss ? Number(stopLoss) : null,
+          timeInForce,
+          note: "Submitted from full screen chart",
+        }),
+      });
+
+      setPortfolioData((prev) => ({
+        portfolio: result.portfolio,
+        orders: [result.order, ...(prev?.orders || [])],
+      }));
+      setTradeSuccess(
+        `${result.order.side} order placed for ${result.order.quantity} ${result.order.pair}.`
+      );
+      setQuantity(1);
+      setLimitPrice("");
+      setStopLoss("");
+    } catch (submitError) {
+      setTradeError(submitError.message || "Failed to place order");
+    } finally {
+      setSubmittingTrade(false);
+    }
+  }
 
   return (
     <div style={pageStyle}>
@@ -270,18 +366,203 @@ export default function ChartFullscreen() {
           </div>
         ) : null}
 
-        <div style={chartShellStyle}>
-          <CandlestickChart
-            candles={candles}
-            timeframe={timeframe}
-            width={1600}
-            height={820}
-            minWidth={980}
-            emptyMinHeight={620}
-            visibleCandles={visibleCandles}
-            showPriceLine={showPriceLine}
-            showHighLowGuide={showHighLowGuide}
-          />
+        <div style={workspaceStyle}>
+          <div style={chartShellStyle}>
+            <CandlestickChart
+              candles={candles}
+              timeframe={timeframe}
+              width={1600}
+              height={820}
+              minWidth={980}
+              emptyMinHeight={620}
+              visibleCandles={visibleCandles}
+              showPriceLine={showPriceLine}
+              showHighLowGuide={showHighLowGuide}
+            />
+          </div>
+
+          <aside style={tradePanelStyle}>
+            <div style={tradeHeaderStyle}>
+              <div style={toolLabelStyle}>Trade From Chart</div>
+              <div style={{ fontSize: 13, color: "#cbd5e1" }}>
+                {selectedPair} at {formatCurrency(candleClose, 4)}
+              </div>
+            </div>
+
+            <div style={tradeStatsCardStyle}>
+              <div style={tradeStatItemStyle}>
+                <span style={snapshotKeyStyle}>Cash</span>
+                <strong>
+                  {formatCurrency(portfolioData?.portfolio?.cashBalance ?? 0)}
+                </strong>
+              </div>
+              <div style={tradeStatItemStyle}>
+                <span style={snapshotKeyStyle}>Equity</span>
+                <strong>
+                  {formatCurrency(portfolioData?.portfolio?.equityValue ?? 0)}
+                </strong>
+              </div>
+              <div style={tradeStatItemStyle}>
+                <span style={snapshotKeyStyle}>Position</span>
+                <strong>
+                  {currentPosition
+                    ? `${currentPosition.direction} ${currentPosition.absoluteQuantity}`
+                    : "Flat"}
+                </strong>
+              </div>
+              <div style={tradeStatItemStyle}>
+                <span style={snapshotKeyStyle}>Avg Price</span>
+                <strong>
+                  {formatCurrency(currentPosition?.averagePrice ?? 0, 4)}
+                </strong>
+              </div>
+            </div>
+
+            <form onSubmit={handleSubmitTrade} style={tradeFormStyle}>
+              <div style={fieldGridStyle}>
+                <label style={labelStyle}>
+                  Action
+                  <select
+                    value={side}
+                    onChange={(event) => setSide(event.target.value)}
+                    style={controlStyle}
+                  >
+                    <option>Buy</option>
+                    <option>Sell</option>
+                  </select>
+                </label>
+
+                <label style={labelStyle}>
+                  Quantity
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={quantity}
+                    onChange={(event) => setQuantity(event.target.value)}
+                    style={controlStyle}
+                  />
+                </label>
+              </div>
+
+              <div
+                style={{
+                  padding: "12px 14px",
+                  borderRadius: 14,
+                  border:
+                    side === "Buy"
+                      ? "1px solid rgba(34, 197, 94, 0.28)"
+                      : "1px solid rgba(248, 113, 113, 0.28)",
+                  background:
+                    side === "Buy"
+                      ? "rgba(20, 83, 45, 0.2)"
+                      : "rgba(127, 29, 29, 0.18)",
+                  fontSize: 13,
+                  color: "#cbd5e1",
+                }}
+              >
+                <div style={{ fontWeight: 700, marginBottom: 4 }}>
+                  {side === "Buy" ? "Long / Cover Intent" : "Short / Reduce Intent"}
+                </div>
+                <div style={{ color: "#94a3b8", lineHeight: 1.6 }}>{sideIntent}</div>
+              </div>
+
+              <div style={fieldGridStyle}>
+                <label style={labelStyle}>
+                  Order Type
+                  <select
+                    value={orderType}
+                    onChange={(event) => setOrderType(event.target.value)}
+                    style={controlStyle}
+                  >
+                    <option>Market</option>
+                    <option>Limit</option>
+                  </select>
+                </label>
+
+                <label style={labelStyle}>
+                  Time In Force
+                  <select
+                    value={timeInForce}
+                    onChange={(event) => setTimeInForce(event.target.value)}
+                    style={controlStyle}
+                  >
+                    <option>Day</option>
+                    <option>GTC</option>
+                  </select>
+                </label>
+              </div>
+
+              <label style={labelStyle}>
+                Limit Price
+                <input
+                  type="number"
+                  value={limitPrice}
+                  onChange={(event) => setLimitPrice(event.target.value)}
+                  placeholder="Required for limit orders"
+                  style={controlStyle}
+                />
+              </label>
+
+              <label style={labelStyle}>
+                Stop Loss
+                <input
+                  type="number"
+                  value={stopLoss}
+                  onChange={(event) => setStopLoss(event.target.value)}
+                  placeholder="Optional"
+                  style={controlStyle}
+                />
+              </label>
+
+              {tradeError ? <div style={tradeErrorStyle}>{tradeError}</div> : null}
+              {tradeSuccess ? <div style={tradeSuccessStyle}>{tradeSuccess}</div> : null}
+
+              <button
+                type="submit"
+                disabled={submittingTrade}
+                style={{
+                  ...submitTradeButtonStyle,
+                  background:
+                    side === "Buy"
+                      ? "linear-gradient(135deg, #22c55e, #16a34a)"
+                      : "linear-gradient(135deg, #f87171, #ef4444)",
+                }}
+              >
+                {submittingTrade
+                  ? "Submitting..."
+                  : side === "Buy"
+                    ? `Buy / Cover ${selectedPair}`
+                    : `Sell / Short ${selectedPair}`}
+              </button>
+            </form>
+
+            <div style={recentOrdersCardStyle}>
+              <div style={toolLabelStyle}>Recent Orders</div>
+              {recentOrders.length === 0 ? (
+                <div style={{ fontSize: 13, color: "#94a3b8" }}>
+                  No recent orders for this pair yet.
+                </div>
+              ) : (
+                <div style={recentOrdersListStyle}>
+                  {recentOrders.map((order) => (
+                    <div key={order.id} style={recentOrderItemStyle}>
+                      <div style={{ fontWeight: 700 }}>
+                        {order.side} {order.quantity} {order.pair}
+                      </div>
+                      <div style={{ fontSize: 12, color: "#94a3b8" }}>
+                        {formatCurrency(
+                          order.executedPrice || order.requestedPrice || 0,
+                          4
+                        )}{" "}
+                        - {order.status}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </aside>
         </div>
       </div>
     </div>
@@ -403,6 +684,14 @@ const chartShellStyle = {
   overflow: "hidden",
 };
 
+const workspaceStyle = {
+  display: "grid",
+  gridTemplateColumns: "minmax(0, 1.9fr) minmax(320px, 0.9fr)",
+  gap: 18,
+  flex: 1,
+  minHeight: 0,
+};
+
 const toolsGridStyle = {
   display: "grid",
   gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
@@ -469,4 +758,93 @@ const snapshotKeyStyle = {
   color: "#94a3b8",
   textTransform: "uppercase",
   letterSpacing: "0.06em",
+};
+
+const tradePanelStyle = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 14,
+  minHeight: 0,
+};
+
+const tradeHeaderStyle = {
+  borderRadius: 18,
+  border: "1px solid rgba(51, 65, 85, 0.8)",
+  background: "rgba(15, 23, 42, 0.75)",
+  padding: 14,
+};
+
+const tradeStatsCardStyle = {
+  borderRadius: 18,
+  border: "1px solid rgba(51, 65, 85, 0.8)",
+  background: "rgba(15, 23, 42, 0.75)",
+  padding: 14,
+  display: "grid",
+  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+  gap: 10,
+};
+
+const tradeStatItemStyle = {
+  padding: 10,
+  borderRadius: 14,
+  background: "rgba(2, 6, 23, 0.72)",
+  border: "1px solid rgba(30, 41, 59, 0.9)",
+  display: "flex",
+  flexDirection: "column",
+  gap: 4,
+};
+
+const tradeFormStyle = {
+  borderRadius: 18,
+  border: "1px solid rgba(51, 65, 85, 0.8)",
+  background: "rgba(15, 23, 42, 0.75)",
+  padding: 14,
+  display: "flex",
+  flexDirection: "column",
+  gap: 12,
+};
+
+const fieldGridStyle = {
+  display: "grid",
+  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+  gap: 10,
+};
+
+const submitTradeButtonStyle = {
+  padding: "12px 14px",
+  borderRadius: 12,
+  border: "none",
+  color: "#0b1120",
+  cursor: "pointer",
+  fontWeight: 800,
+};
+
+const tradeErrorStyle = {
+  fontSize: 12,
+  color: "#fca5a5",
+};
+
+const tradeSuccessStyle = {
+  fontSize: 12,
+  color: "#86efac",
+};
+
+const recentOrdersCardStyle = {
+  borderRadius: 18,
+  border: "1px solid rgba(51, 65, 85, 0.8)",
+  background: "rgba(15, 23, 42, 0.75)",
+  padding: 14,
+};
+
+const recentOrdersListStyle = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 8,
+};
+
+const recentOrderItemStyle = {
+  padding: "10px 12px",
+  borderRadius: 12,
+  background: "rgba(2, 6, 23, 0.72)",
+  border: "1px solid rgba(30, 41, 59, 0.9)",
 };

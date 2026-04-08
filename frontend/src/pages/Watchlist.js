@@ -61,7 +61,8 @@ export default function Watchlist() {
     <MainLayout>
       <h1 className="page-title">Watchlist</h1>
       <p className="page-subtitle">
-        Watchlist data is backed by the Node/Express API and PostgreSQL.
+        Keep your highest-interest pairs close so you can move from scanning to
+        charting and trading without friction.
       </p>
 
       {/* Add form */}
@@ -165,8 +166,8 @@ export default function Watchlist() {
         )}
 
         <p className="text-muted" style={{ marginTop: 8, fontSize: 11 }}>
-          Live market pricing will be connected in the next phase through a
-          dedicated market data service layer.
+          Monitoring {items.length} pair{items.length === 1 ? "" : "s"} from your
+          saved watchlist.
         </p>
       </div>
     </MainLayout>

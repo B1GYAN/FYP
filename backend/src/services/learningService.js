@@ -116,7 +116,7 @@ async function analyzePortfolioBehavior(client, userId, portfolioId) {
     `
       SELECT COUNT(*)::int AS count
       FROM holdings
-      WHERE portfolio_id = $1 AND quantity > 0
+      WHERE portfolio_id = $1 AND quantity <> 0
     `,
     [portfolioId]
   );

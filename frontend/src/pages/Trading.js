@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import MainLayout from "../layout/MainLayout";
 import LoadingCard from "../components/LoadingCard";
 import { apiRequest } from "../config/apiClient";
@@ -18,7 +18,7 @@ export default function Trading() {
   const [submitError, setSubmitError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const { data, setData, loading, error } = useAsyncData(async () => {
+  const loadTradingWorkspace = useCallback(async () => {
     const [portfolio, orders, market] = await Promise.all([
       apiRequest("/api/portfolio", { token }),
       apiRequest("/api/portfolio/orders", { token }),
@@ -27,6 +27,7 @@ export default function Trading() {
 
     return { portfolio, orders, market };
   }, [token]);
+  const { data, setData, loading, error } = useAsyncData(loadTradingWorkspace);
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -99,19 +100,24 @@ export default function Trading() {
   const selectedMarket = market.find((item) => item.pair === symbol);
   const positions = data?.portfolio?.holdings || [];
   const orders = data?.orders || [];
+  const selectedPosition = positions.find((position) => position.pair === symbol);
+  const sideIntent =
+    side === "Buy"
+      ? "Build or add to a long, or cover an existing short."
+      : "Reduce a long, or open or extend a short position.";
 
   return (
     <MainLayout>
-      <h1 className="page-title">Trading Module — Place Orders</h1>
+      <h1 className="page-title">Trading Module - Intraday Orders</h1>
       <p className="page-subtitle">
-        Submit market or limit orders using virtual funds and track portfolio
-        changes immediately.
+        Trade both directions. Buy can build longs or cover shorts, and sell can
+        reduce longs or open fresh short exposure.
       </p>
 
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "1.5fr 2fr",
+          gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
           gap: "16px",
         }}
       >
@@ -143,7 +149,7 @@ export default function Trading() {
                 </select>
               </div>
               <div>
-                <label style={{ fontSize: 13, color: "#cbd5f5" }}>Side</label>
+                <label style={{ fontSize: 13, color: "#cbd5f5" }}>Action</label>
                 <select
                   value={side}
                   onChange={(e) => setSide(e.target.value)}
@@ -153,6 +159,28 @@ export default function Trading() {
                   <option>Sell</option>
                 </select>
               </div>
+            </div>
+
+            <div
+              style={{
+                marginBottom: "12px",
+                padding: "12px 14px",
+                borderRadius: 14,
+                border:
+                  side === "Buy"
+                    ? "1px solid rgba(34, 197, 94, 0.28)"
+                    : "1px solid rgba(248, 113, 113, 0.28)",
+                background:
+                  side === "Buy"
+                    ? "rgba(20, 83, 45, 0.2)"
+                    : "rgba(127, 29, 29, 0.18)",
+                fontSize: 13,
+              }}
+            >
+              <div style={{ fontWeight: 700, marginBottom: 4 }}>
+                {side === "Buy" ? "Long / Cover Intent" : "Short / Reduce Intent"}
+              </div>
+              <div style={{ color: "#94a3b8", lineHeight: 1.6 }}>{sideIntent}</div>
             </div>
 
             <div
@@ -250,7 +278,7 @@ export default function Trading() {
                   cursor: "pointer",
                 }}
               >
-                {submitting ? "Submitting..." : "Submit Order"}
+                {submitting ? "Submitting..." : side === "Buy" ? "Submit Buy / Cover" : "Submit Sell / Short"}
               </button>
               <button
                 type="button"
@@ -282,6 +310,12 @@ export default function Trading() {
               Current price for {symbol}:{" "}
               {selectedMarket ? formatCurrency(selectedMarket.price, 4) : "--"}
             </p>
+            <p className="text-muted" style={{ fontSize: 13, marginBottom: 0 }}>
+              Active position for {symbol}:{" "}
+              {selectedPosition
+                ? `${selectedPosition.direction} ${selectedPosition.absoluteQuantity}`
+                : "Flat"}
+            </p>
           </div>
 
           <div className="card">
@@ -290,15 +324,17 @@ export default function Trading() {
               <thead>
                 <tr>
                   <th>Symbol</th>
+                  <th>Side</th>
                   <th>Qty</th>
                   <th>Avg Price</th>
+                  <th>Exposure</th>
                   <th>Unrealized P/L</th>
                 </tr>
               </thead>
               <tbody>
                 {positions.length === 0 ? (
                   <tr>
-                    <td colSpan="4" className="text-muted">
+                    <td colSpan="6" className="text-muted">
                       No open positions.
                     </td>
                   </tr>
@@ -306,8 +342,16 @@ export default function Trading() {
                   positions.map((position) => (
                     <tr key={position.id}>
                       <td>{position.pair}</td>
-                      <td>{position.quantity}</td>
+                      <td
+                        className={
+                          position.direction === "LONG" ? "text-green" : "text-red"
+                        }
+                      >
+                        {position.direction}
+                      </td>
+                      <td>{position.absoluteQuantity}</td>
                       <td>{formatCurrency(position.averagePrice, 4)}</td>
+                      <td>{formatCurrency(position.exposureValue)}</td>
                       <td
                         className={
                           position.unrealizedPl >= 0 ? "text-green" : "text-red"

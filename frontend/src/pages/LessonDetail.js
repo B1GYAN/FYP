@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import MainLayout from "../layout/MainLayout";
 import LoadingCard from "../components/LoadingCard";
@@ -14,10 +14,11 @@ export default function LessonDetail() {
   const [answers, setAnswers] = useState({});
   const [quizResult, setQuizResult] = useState(null);
   const [quizError, setQuizError] = useState("");
-  const { data, setData, loading, error } = useAsyncData(
+  const loadLearningDashboard = useCallback(
     async () => apiRequest("/api/learn/dashboard", { token }),
     [token]
   );
+  const { data, setData, loading, error } = useAsyncData(loadLearningDashboard);
 
   const lessons = useMemo(() => data?.lessons || [], [data]);
   const lesson = useMemo(
@@ -153,7 +154,7 @@ export default function LessonDetail() {
         >
           <div>
             <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 8 }}>
-              {lesson.category} • {lesson.level}
+              {lesson.category} - {lesson.level}
             </div>
             <h1 className="page-title" style={{ marginBottom: 10 }}>
               {lesson.title}

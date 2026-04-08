@@ -75,6 +75,7 @@ describe("learning routes", () => {
           id: "user-1",
           full_name: "Bigyan Lama",
           email: "bigyan@example.com",
+          subscription_tier: "PREMIUM",
           created_at: "2026-01-01T00:00:00.000Z",
         },
       ],
@@ -87,5 +88,32 @@ describe("learning routes", () => {
     expect(response.statusCode).toBe(200);
     expect(response.body.progress.totalLessons).toBe(4);
     expect(response.body.recommendations).toHaveLength(1);
+  });
+
+  test("blocks standard users from the learning dashboard", async () => {
+    const token = jwt.sign(
+      { sub: "user-1", email: "bigyan@example.com" },
+      env.jwtSecret
+    );
+
+    db.query.mockResolvedValueOnce({
+      rowCount: 1,
+      rows: [
+        {
+          id: "user-1",
+          full_name: "Bigyan Lama",
+          email: "bigyan@example.com",
+          subscription_tier: "STANDARD",
+          created_at: "2026-01-01T00:00:00.000Z",
+        },
+      ],
+    });
+
+    const response = await request(app)
+      .get("/api/learn/dashboard")
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(response.statusCode).toBe(403);
+    expect(response.body.error).toMatch(/Premium/i);
   });
 });
