@@ -102,6 +102,11 @@ a {
   background: rgba(20, 83, 45, 0.26);
 }
 
+.header-pill-negative {
+  border-color: rgba(248, 113, 113, 0.28);
+  background: rgba(127, 29, 29, 0.22);
+}
+
 .header-status {
   display: inline-flex;
   align-items: center;
@@ -343,6 +348,579 @@ a {
   margin-top: 20px;
 }
 
+.watchlist-page {
+  display: grid;
+  gap: 18px;
+}
+
+.watchlist-hero {
+  padding: 26px;
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at top right, rgba(125, 211, 252, 0.12), transparent 24%),
+    radial-gradient(circle at bottom left, rgba(20, 184, 166, 0.12), transparent 28%),
+    linear-gradient(145deg, rgba(10, 18, 32, 0.98), rgba(6, 12, 23, 0.98));
+}
+
+.watchlist-overline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(8, 15, 28, 0.72);
+  border: 1px solid rgba(45, 212, 191, 0.16);
+  color: #99f6e4;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.watchlist-overline-compact {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #14b8a6;
+  box-shadow: 0 0 14px rgba(20, 184, 166, 0.72);
+}
+
+.live-dot-refreshing {
+  background: #f59e0b;
+  box-shadow: 0 0 14px rgba(245, 158, 11, 0.72);
+  animation: pulse-glow 1.2s ease infinite;
+}
+
+.watchlist-hero-header {
+  margin-top: 18px;
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.watchlist-title {
+  max-width: 760px;
+  margin-bottom: 10px;
+}
+
+.watchlist-subtitle {
+  max-width: 760px;
+  margin-bottom: 0;
+}
+
+.watchlist-inline-link {
+  color: #99f6e4;
+  border-bottom: 1px solid rgba(153, 246, 228, 0.3);
+}
+
+.watchlist-inline-link:hover {
+  color: #ccfbf1;
+  border-color: rgba(204, 251, 241, 0.44);
+}
+
+.watchlist-hero-actions {
+  min-width: 260px;
+  display: grid;
+  gap: 12px;
+  justify-items: end;
+}
+
+.watchlist-sync-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  background: rgba(8, 15, 28, 0.72);
+  color: #cbd5e1;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.watchlist-button-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.watchlist-button {
+  padding: 10px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(8, 15, 28, 0.7);
+  color: #f8fafc;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  transition: transform 0.18s ease, border-color 0.18s ease,
+    background 0.18s ease, box-shadow 0.18s ease;
+}
+
+.watchlist-button:hover {
+  transform: translateY(-1px);
+  border-color: rgba(125, 211, 252, 0.34);
+  background: rgba(15, 23, 42, 0.92);
+  box-shadow: 0 18px 34px rgba(2, 6, 23, 0.28);
+}
+
+.watchlist-button:disabled {
+  transform: none;
+  cursor: default;
+  opacity: 0.65;
+  box-shadow: none;
+}
+
+.watchlist-button-primary {
+  border-color: rgba(45, 212, 191, 0.34);
+  background: linear-gradient(135deg, rgba(20, 184, 166, 0.22), rgba(14, 116, 144, 0.26));
+  color: #ecfeff;
+}
+
+.watchlist-kpi-grid {
+  margin-top: 24px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 14px;
+}
+
+.watchlist-kpi-card {
+  min-height: 138px;
+  padding: 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  background: rgba(8, 15, 28, 0.74);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.watchlist-kpi-label,
+.watchlist-detail-label {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.watchlist-kpi-value {
+  margin-top: 10px;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1.1;
+}
+
+.watchlist-kpi-note,
+.watchlist-section-copy {
+  color: #94a3b8;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.watchlist-kpi-note {
+  margin-top: 10px;
+}
+
+.watchlist-toolbar-card,
+.watchlist-empty-state,
+.watchlist-table-card,
+.watchlist-heatmap-card,
+.watchlist-spotlight-card,
+.watchlist-tape-card {
+  padding: 22px;
+}
+
+.watchlist-toolbar-head,
+.watchlist-panel-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.watchlist-toolbar-head h2,
+.watchlist-panel-header h2,
+.watchlist-empty-state h2,
+.watchlist-spotlight-card h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.watchlist-panel-header {
+  margin-bottom: 16px;
+}
+
+.watchlist-section-copy {
+  margin: 6px 0 0;
+}
+
+.watchlist-mini-stat {
+  padding: 10px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  background: rgba(8, 15, 28, 0.72);
+  color: #cbd5e1;
+  font-size: 12px;
+}
+
+.watchlist-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.watchlist-input-group {
+  display: grid;
+  gap: 8px;
+}
+
+.watchlist-input-label {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.watchlist-input {
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(8, 15, 28, 0.82);
+  color: #f8fafc;
+  font-size: 14px;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease,
+    background 0.18s ease;
+}
+
+.watchlist-input:focus {
+  outline: none;
+  border-color: rgba(45, 212, 191, 0.48);
+  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.14);
+  background: rgba(15, 23, 42, 0.95);
+}
+
+.watchlist-add-button {
+  min-width: 180px;
+  justify-content: center;
+}
+
+.watchlist-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.watchlist-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  background: rgba(8, 15, 28, 0.7);
+  color: #f8fafc;
+  cursor: pointer;
+  transition: transform 0.18s ease, border-color 0.18s ease,
+    background 0.18s ease;
+}
+
+.watchlist-chip:hover {
+  transform: translateY(-1px);
+  border-color: rgba(125, 211, 252, 0.28);
+  background: rgba(15, 23, 42, 0.92);
+}
+
+.watchlist-chip-move {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.watchlist-error-card {
+  border-color: rgba(248, 113, 113, 0.36);
+  background: rgba(127, 29, 29, 0.16);
+  color: #fecaca;
+}
+
+.watchlist-empty-state {
+  display: grid;
+  gap: 16px;
+}
+
+.watchlist-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1.65fr) minmax(300px, 0.95fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.watchlist-main-column,
+.watchlist-side-column {
+  display: grid;
+  gap: 18px;
+}
+
+.watchlist-side-column {
+  position: sticky;
+  top: 24px;
+}
+
+.watchlist-table-wrap {
+  overflow-x: auto;
+}
+
+.watchlist-table {
+  min-width: 760px;
+}
+
+.watchlist-table tbody tr {
+  border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+}
+
+.watchlist-row,
+.watchlist-row-active {
+  cursor: pointer;
+  transition: background 0.18s ease, box-shadow 0.18s ease;
+}
+
+.watchlist-row:hover,
+.watchlist-row:focus,
+.watchlist-row-active {
+  background: rgba(15, 23, 42, 0.82);
+  outline: none;
+}
+
+.watchlist-row-active {
+  box-shadow: inset 2px 0 0 #7dd3fc;
+}
+
+.watchlist-table td {
+  vertical-align: middle;
+}
+
+.watchlist-pair-stack {
+  display: grid;
+  gap: 4px;
+}
+
+.watchlist-pair-stack strong {
+  font-size: 14px;
+  color: #f8fafc;
+}
+
+.watchlist-pair-stack span {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.watchlist-change-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.watchlist-change-positive {
+  border-color: rgba(34, 197, 94, 0.24);
+  background: rgba(20, 83, 45, 0.24);
+  color: #86efac;
+}
+
+.watchlist-change-negative {
+  border-color: rgba(248, 113, 113, 0.24);
+  background: rgba(127, 29, 29, 0.24);
+  color: #fecdd3;
+}
+
+.watchlist-strength {
+  min-width: 144px;
+  display: grid;
+  gap: 6px;
+}
+
+.watchlist-strength span {
+  font-size: 11px;
+  color: #94a3b8;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.watchlist-strength-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(30, 41, 59, 0.86);
+  overflow: hidden;
+}
+
+.watchlist-strength-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+}
+
+.watchlist-heatmap-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(165px, 1fr));
+  gap: 12px;
+}
+
+.watchlist-heat-tile {
+  min-height: 148px;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  color: #f8fafc;
+  cursor: pointer;
+  text-align: left;
+  transition: transform 0.18s ease, box-shadow 0.18s ease,
+    border-color 0.18s ease;
+}
+
+.watchlist-heat-tile:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 20px 34px rgba(2, 6, 23, 0.28);
+}
+
+.watchlist-heat-symbol {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #dbeafe;
+}
+
+.watchlist-heat-price {
+  margin-top: 16px;
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+}
+
+.watchlist-heat-change {
+  margin-top: 8px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.watchlist-heat-source {
+  margin-top: auto;
+  padding-top: 20px;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.watchlist-spotlight-card {
+  display: grid;
+  gap: 14px;
+}
+
+.watchlist-spotlight-price {
+  font-size: 44px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.05em;
+}
+
+.watchlist-spotlight-change {
+  margin-top: -4px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.watchlist-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.watchlist-detail-item {
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  background: rgba(8, 15, 28, 0.72);
+}
+
+.watchlist-detail-value {
+  margin-top: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.watchlist-tape-list {
+  display: grid;
+  gap: 10px;
+}
+
+.watchlist-tape-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  background: rgba(8, 15, 28, 0.7);
+  color: #f8fafc;
+  cursor: pointer;
+  transition: transform 0.18s ease, border-color 0.18s ease,
+    background 0.18s ease;
+}
+
+.watchlist-tape-item:hover {
+  transform: translateY(-1px);
+  border-color: rgba(125, 211, 252, 0.28);
+  background: rgba(15, 23, 42, 0.92);
+}
+
+.watchlist-tape-rank {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: rgba(30, 41, 59, 0.84);
+  color: #7dd3fc;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.watchlist-tape-copy {
+  display: grid;
+  gap: 4px;
+  text-align: left;
+}
+
+.watchlist-tape-pair {
+  font-weight: 700;
+}
+
+.watchlist-tape-price {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.watchlist-tape-move {
+  font-size: 13px;
+  font-weight: 700;
+}
+
 @media (max-width: 900px) {
   .app-header {
     padding: 16px 18px;
@@ -364,6 +942,49 @@ a {
 
   .app-main {
     padding: 22px 18px 28px;
+  }
+}
+
+@media (max-width: 1200px) {
+  .watchlist-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .watchlist-side-column {
+    position: static;
+  }
+}
+
+@media (max-width: 900px) {
+  .watchlist-hero,
+  .watchlist-toolbar-card,
+  .watchlist-empty-state,
+  .watchlist-table-card,
+  .watchlist-heatmap-card,
+  .watchlist-spotlight-card,
+  .watchlist-tape-card {
+    padding: 18px;
+  }
+
+  .watchlist-hero-actions {
+    justify-items: start;
+    min-width: auto;
+  }
+
+  .watchlist-form {
+    grid-template-columns: 1fr;
+  }
+
+  .watchlist-add-button {
+    width: 100%;
+  }
+
+  .watchlist-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .watchlist-spotlight-price {
+    font-size: 36px;
   }
 }
 
@@ -507,5 +1128,18 @@ a {
   to {
     opacity: 1;
     transform: translateX(0);
+  }
+}
+
+@keyframes pulse-glow {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  50% {
+    transform: scale(1.14);
+    opacity: 0.72;
   }
 }
