@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import { apiRequest } from "../config/apiClient";
 import { useAuth } from "../context/AuthContext";
+import { formatCurrency } from "../utils/formatters";
 import {
   loadChartPreferences,
   persistChartPreferences,
@@ -9,12 +11,14 @@ import {
 } from "../utils/chartWorkspace";
 
 export default function MainLayout({ children }) {
-  const { user, isPremium, logout } = useAuth();
+  const { user, token, isPremium, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [sessionMode, setSessionMode] = useState(
     () => loadChartPreferences().sessionMode
   );
+  const [portfolioSummary, setPortfolioSummary] = useState(null);
+  const [portfolioSyncedAt, setPortfolioSyncedAt] = useState(null);
 
   useEffect(() => {
     function syncSessionMode(event) {
@@ -43,6 +47,42 @@ export default function MainLayout({ children }) {
     setSessionMode("LIVE");
   }, [isPremium, sessionMode]);
 
+  useEffect(() => {
+    if (!token) {
+      setPortfolioSummary(null);
+      setPortfolioSyncedAt(null);
+      return undefined;
+    }
+
+    let active = true;
+
+    async function loadPortfolioSummary() {
+      try {
+        const summary = await apiRequest("/api/portfolio", { token });
+
+        if (!active) {
+          return;
+        }
+
+        setPortfolioSummary(summary);
+        setPortfolioSyncedAt(new Date());
+      } catch (error) {
+        if (active) {
+          console.error("Failed to refresh header portfolio summary:", error);
+        }
+      }
+    }
+
+    loadPortfolioSummary();
+
+    const intervalId = window.setInterval(loadPortfolioSummary, 15000);
+
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+    };
+  }, [location.pathname, token]);
+
   function applySessionMode(nextMode) {
     const normalizedMode =
       nextMode === "REPLAY" && !isPremium ? "LIVE" : nextMode;
@@ -67,6 +107,20 @@ export default function MainLayout({ children }) {
   const activeSessionMode =
     SESSION_MODE_OPTIONS.find((option) => option.value === sessionMode) ||
     SESSION_MODE_OPTIONS[0];
+  const openPlValue = portfolioSummary?.unrealizedPl;
+  const openPlClassName =
+    typeof openPlValue !== "number"
+      ? ""
+      : openPlValue >= 0
+        ? " header-pill-positive"
+        : " header-pill-negative";
+  const positionsCount = portfolioSummary?.holdings?.length ?? "--";
+  const syncedLabel = portfolioSyncedAt
+    ? `Synced ${portfolioSyncedAt.toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      })}`
+    : "Awaiting sync";
 
   return (
     <div className="app-shell">
@@ -87,14 +141,23 @@ export default function MainLayout({ children }) {
             Plan <strong>{user?.subscriptionTier || "STANDARD"}</strong>
           </span>
           <span className="header-pill">
-            Equity <strong>$10,000</strong>
+            Equity{" "}
+            <strong>
+              {portfolioSummary ? formatCurrency(portfolioSummary.equityValue) : "--"}
+            </strong>
           </span>
-          <span className="header-pill header-pill-positive">
-            Today&apos;s P/L <strong>+$250</strong>
+          <span className={`header-pill${openPlClassName}`}>
+            Open P/L{" "}
+            <strong>
+              {portfolioSummary ? formatCurrency(portfolioSummary.unrealizedPl) : "--"}
+            </strong>
+          </span>
+          <span className="header-pill">
+            Positions <strong>{positionsCount}</strong>
           </span>
           <span className="header-status">
             <span className="header-status-dot" />
-            Simulated Account
+            Simulated Account • {syncedLabel}
           </span>
           <button className="header-button" onClick={logout}>
             Logout
