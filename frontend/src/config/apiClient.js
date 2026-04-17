@@ -2,15 +2,23 @@ import { buildApiUrl } from "./api";
 
 export async function apiRequest(path, options = {}) {
   const { token, headers = {}, ...rest } = options;
+  const requestUrl = buildApiUrl(path);
+  let response;
 
-  const response = await fetch(buildApiUrl(path), {
-    ...rest,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...headers,
-    },
-  });
+  try {
+    response = await fetch(requestUrl, {
+      ...rest,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...headers,
+      },
+    });
+  } catch (error) {
+    throw new Error(
+      `Unable to reach the backend server at ${requestUrl}. Make sure the backend is running.`
+    );
+  }
 
   const body = await response.json().catch(() => ({}));
 

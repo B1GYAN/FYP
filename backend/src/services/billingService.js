@@ -6,6 +6,7 @@ const runSqlFile = require("../scripts/runSqlFile");
 const PREMIUM_PLAN_CODE = "PREMIUM_MONTHLY";
 const SKRILL_PROVIDER = "SKRILL";
 const SKRILL_DEMO_PROVIDER = "SKRILL_DEMO";
+const PREMIUM_STARTING_BALANCE = 100000;
 const FINAL_STATUSES = new Set(["PROCESSED", "FAILED", "CANCELLED", "CHARGEBACK"]);
 let billingSchemaRecoveryPromise = null;
 
@@ -215,6 +216,116 @@ async function downgradeIfNoProcessedPayments(client, userId, excludePaymentId) 
   }
 }
 
+async function applyPremiumUpgrade(client, userId) {
+  await client.query(
+    `
+      UPDATE users
+      SET
+        subscription_tier = 'PREMIUM',
+        starting_balance = $2,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = $1
+    `,
+    [userId, PREMIUM_STARTING_BALANCE]
+  );
+
+  await client.query(
+    `
+      UPDATE portfolios
+      SET
+        cash_balance = $2,
+        equity_value = $2,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE user_id = $1
+    `,
+    [userId, PREMIUM_STARTING_BALANCE]
+  );
+}
+
+async function reconcileLegacyPremiumBalanceInTransaction(client, userId) {
+  const result = await client.query(
+    `
+      SELECT
+        u.subscription_tier,
+        u.starting_balance,
+        EXISTS (
+          SELECT 1
+          FROM billing_payments bp
+          WHERE bp.user_id = u.id AND bp.status = 'PROCESSED'
+        ) AS has_processed_payment
+      FROM users u
+      WHERE u.id = $1
+      FOR UPDATE
+    `,
+    [userId]
+  );
+
+  if (result.rowCount === 0) {
+    return false;
+  }
+
+  const row = result.rows[0];
+  const currentStartingBalance = Number(row.starting_balance || 0);
+  const isPremium = (row.subscription_tier || "STANDARD") === "PREMIUM";
+  const hasProcessedPayment = row.has_processed_payment === true;
+
+  if (
+    !isPremium ||
+    !hasProcessedPayment ||
+    currentStartingBalance >= PREMIUM_STARTING_BALANCE
+  ) {
+    return false;
+  }
+
+  const premiumBalanceDelta = PREMIUM_STARTING_BALANCE - currentStartingBalance;
+
+  await client.query(
+    `
+      UPDATE users
+      SET
+        starting_balance = $2,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = $1
+    `,
+    [userId, PREMIUM_STARTING_BALANCE]
+  );
+
+  await client.query(
+    `
+      UPDATE portfolios
+      SET
+        cash_balance = cash_balance + $2,
+        equity_value = equity_value + $2,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE user_id = $1
+    `,
+    [userId, premiumBalanceDelta]
+  );
+
+  return true;
+}
+
+async function reconcileLegacyPremiumBalance(userId) {
+  return withBillingSchemaRecovery(async () => {
+    const client = await db.getClient();
+
+    try {
+      await client.query("BEGIN");
+      const didReconcile = await reconcileLegacyPremiumBalanceInTransaction(
+        client,
+        userId
+      );
+      await client.query("COMMIT");
+      return didReconcile;
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  });
+}
+
 async function processSkrillStatus(payload) {
   requireSkrillConfiguration();
 
@@ -285,15 +396,8 @@ async function processSkrillStatus(payload) {
         ]
       );
 
-      if (nextStatus === "PROCESSED") {
-        await client.query(
-          `
-            UPDATE users
-            SET subscription_tier = 'PREMIUM', updated_at = CURRENT_TIMESTAMP
-            WHERE id = $1
-          `,
-          [payment.user_id]
-        );
+      if (nextStatus === "PROCESSED" && payment.status !== "PROCESSED") {
+        await applyPremiumUpgrade(client, payment.user_id);
       }
 
       if (nextStatus === "CHARGEBACK" && payment.status === "PROCESSED") {
@@ -417,14 +521,7 @@ async function completeDemoPayment(userId, paymentId) {
           ]
         );
 
-        await client.query(
-          `
-            UPDATE users
-            SET subscription_tier = 'PREMIUM', updated_at = CURRENT_TIMESTAMP
-            WHERE id = $1
-          `,
-          [userId]
-        );
+        await applyPremiumUpgrade(client, userId);
       }
 
       await client.query("COMMIT");
@@ -450,4 +547,5 @@ module.exports = {
   getBillingPaymentForUser,
   isSkrillConfigured,
   processSkrillStatus,
+  reconcileLegacyPremiumBalance,
 };

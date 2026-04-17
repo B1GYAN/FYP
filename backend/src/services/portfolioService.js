@@ -1,4 +1,5 @@
 const db = require("../../db");
+const billingService = require("./billingService");
 const marketDataService = require("./marketDataService");
 
 function roundCurrency(value) {
@@ -73,6 +74,7 @@ async function getUserHoldings(userId) {
 }
 
 async function getPortfolioSummary(userId) {
+  await billingService.reconcileLegacyPremiumBalance(userId);
   const portfolio = await getUserPortfolioRecord(userId);
   const holdings = await getUserHoldings(userId);
   const positionsValue = holdings.reduce((sum, holding) => sum + holding.marketValue, 0);
