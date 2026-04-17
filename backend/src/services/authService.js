@@ -45,15 +45,12 @@ function validateRegistrationInput({ fullName, email, password, subscriptionTier
     error.statusCode = 400;
     throw error;
   }
-
-  normalizeSubscriptionTier(subscriptionTier);
 }
 
 async function registerUser({ fullName, email, password, subscriptionTier }) {
   validateRegistrationInput({ fullName, email, password, subscriptionTier });
 
   const normalizedEmail = email.trim().toLowerCase();
-  const normalizedTier = normalizeSubscriptionTier(subscriptionTier);
   const client = await db.getClient();
 
   try {
@@ -82,7 +79,7 @@ async function registerUser({ fullName, email, password, subscriptionTier }) {
         VALUES ($1, $2, $3, $4)
         RETURNING id, full_name, email, starting_balance, subscription_tier, created_at
       `,
-      [fullName.trim(), normalizedEmail, passwordHash, normalizedTier]
+      [fullName.trim(), normalizedEmail, passwordHash, "STANDARD"]
     );
 
     const user = userResult.rows[0];

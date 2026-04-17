@@ -9,6 +9,7 @@ import LandingPage from "./pages/LandingPage";
 import Dashboard from "./pages/Dashboard";
 import Trading from "./pages/Trading";
 import Watchlist from "./pages/Watchlist";
+import BillingReturn from "./pages/BillingReturn";
 import Charts from "./pages/Charts";
 import ChartFullscreen from "./pages/ChartFullscreen";
 import Learning from "./pages/Learning";
@@ -60,6 +61,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <Watchlist />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/return"
+            element={
+              <ProtectedRoute>
+                <BillingReturn />
               </ProtectedRoute>
             }
           />

@@ -30,7 +30,7 @@ describe("auth routes", () => {
               full_name: "Bigyan Lama",
               email: "bigyan@example.com",
               starting_balance: 10000,
-              subscription_tier: "PREMIUM",
+              subscription_tier: "STANDARD",
               created_at: "2026-01-01T00:00:00.000Z",
             },
           ],
@@ -52,6 +52,6 @@ describe("auth routes", () => {
     expect(response.statusCode).toBe(201);
     expect(response.body.token).toBeTruthy();
     expect(response.body.user.email).toBe("bigyan@example.com");
-    expect(response.body.user.subscriptionTier).toBe("PREMIUM");
+    expect(response.body.user.subscriptionTier).toBe("STANDARD");
   });
 });

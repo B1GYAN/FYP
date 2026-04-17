@@ -1,5 +1,6 @@
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useState,
@@ -23,6 +24,22 @@ export function AuthProvider({ children }) {
   const [authState, setAuthState] = useState(storedSession);
   const [isBootstrapping, setIsBootstrapping] = useState(true);
 
+  const applySessionProfile = useCallback(async (nextToken) => {
+    const profile = await apiRequest("/api/auth/me", {
+      token: nextToken,
+    });
+
+    const nextState = {
+      token: nextToken,
+      user: profile,
+    };
+
+    setAuthState(nextState);
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(nextState));
+
+    return profile;
+  }, []);
+
   useEffect(() => {
     async function restoreSession() {
       if (!storedSession?.token) {
@@ -31,16 +48,7 @@ export function AuthProvider({ children }) {
       }
 
       try {
-        const profile = await apiRequest("/api/auth/me", {
-          token: storedSession.token,
-        });
-        const nextState = {
-          token: storedSession.token,
-          user: profile,
-        };
-
-        setAuthState(nextState);
-        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(nextState));
+        await applySessionProfile(storedSession.token);
       } catch (error) {
         localStorage.removeItem(AUTH_STORAGE_KEY);
         setAuthState(null);
@@ -50,7 +58,7 @@ export function AuthProvider({ children }) {
     }
 
     restoreSession();
-  }, [storedSession]);
+  }, [applySessionProfile, storedSession]);
 
   async function authenticate(path, payload) {
     const body = await apiRequest(path, {
@@ -74,6 +82,22 @@ export function AuthProvider({ children }) {
     setAuthState(null);
   }
 
+  const refreshProfile = useCallback(async () => {
+    const nextToken = authState?.token;
+
+    if (!nextToken) {
+      return null;
+    }
+
+    try {
+      return await applySessionProfile(nextToken);
+    } catch (error) {
+      localStorage.removeItem(AUTH_STORAGE_KEY);
+      setAuthState(null);
+      throw error;
+    }
+  }, [applySessionProfile, authState?.token]);
+
   const value = {
     user: authState?.user || null,
     token: authState?.token || null,
@@ -84,6 +108,7 @@ export function AuthProvider({ children }) {
     register: (payload) => authenticate("/api/auth/register", payload),
     login: (payload) => authenticate("/api/auth/login", payload),
     logout,
+    refreshProfile,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
