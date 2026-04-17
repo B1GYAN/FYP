@@ -8,7 +8,6 @@ export default function Register() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [subscriptionTier, setSubscriptionTier] = useState("STANDARD");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -18,7 +17,7 @@ export default function Register() {
     try {
       setSubmitting(true);
       setError("");
-      await register({ fullName, email, password, subscriptionTier });
+      await register({ fullName, email, password });
       navigate("/dashboard");
     } catch (submitError) {
       setError(submitError.message);
@@ -33,7 +32,8 @@ export default function Register() {
         <div className="auth-brand">PaperTrade</div>
         <h1 className="auth-title">Create your simulator account</h1>
         <p className="auth-subtitle">
-          New users start with a virtual balance so they can practice safely.
+          New users start on the Standard plan with a virtual balance so they can
+          practice safely. Premium upgrades now happen after sign in through Skrill.
         </p>
 
         <form onSubmit={handleSubmit} className="auth-form">
@@ -70,32 +70,12 @@ export default function Register() {
           </label>
 
           <div className="auth-label">
-            Choose Plan
-            <div style={{ display: "grid", gap: 10, marginTop: 8 }}>
-              {[
-                {
-                  value: "STANDARD",
-                  title: "Standard",
-                  copy: "Free live trading, watchlist, and dashboard access.",
-                },
-                {
-                  value: "PREMIUM",
-                  title: "Premium",
-                  copy: "Unlock Learning Hub, Strategy Lab, and chart replay.",
-                },
-              ].map((plan) => (
-                <button
-                  key={plan.value}
-                  type="button"
-                  onClick={() => setSubscriptionTier(plan.value)}
-                  style={planCardStyle(subscriptionTier === plan.value)}
-                >
-                  <strong>{plan.title}</strong>
-                  <span style={{ fontSize: 12, color: "#94a3b8", marginTop: 6 }}>
-                    {plan.copy}
-                  </span>
-                </button>
-              ))}
+            Plan
+            <div style={planInfoStyle}>
+              <strong>Standard account on signup</strong>
+              <span style={{ fontSize: 12, color: "#94a3b8", marginTop: 6 }}>
+                Upgrade to Premium later from inside the app using Skrill checkout.
+              </span>
             </div>
           </div>
 
@@ -114,21 +94,14 @@ export default function Register() {
   );
 }
 
-function planCardStyle(isActive) {
-  return {
-    width: "100%",
-    padding: "12px 14px",
-    borderRadius: 14,
-    border: isActive
-      ? "1px solid rgba(20, 184, 166, 0.42)"
-      : "1px solid rgba(148, 163, 184, 0.14)",
-    background: isActive
-      ? "linear-gradient(135deg, rgba(20, 184, 166, 0.12), rgba(8, 145, 178, 0.12))"
-      : "rgba(8, 15, 28, 0.62)",
-    color: "#f8fafc",
-    cursor: "pointer",
-    textAlign: "left",
-    display: "flex",
-    flexDirection: "column",
-  };
-}
+const planInfoStyle = {
+  width: "100%",
+  padding: "12px 14px",
+  borderRadius: 14,
+  border: "1px solid rgba(148, 163, 184, 0.14)",
+  background: "rgba(8, 15, 28, 0.62)",
+  color: "#f8fafc",
+  textAlign: "left",
+  display: "flex",
+  flexDirection: "column",
+};

@@ -181,3 +181,24 @@ CREATE TABLE IF NOT EXISTS backtest_results (
   result_payload JSONB NOT NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS billing_payments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  provider VARCHAR(30) NOT NULL,
+  plan_code VARCHAR(40) NOT NULL,
+  merchant_transaction_id VARCHAR(100) NOT NULL UNIQUE,
+  provider_transaction_id VARCHAR(100),
+  amount NUMERIC(12, 2) NOT NULL,
+  currency VARCHAR(10) NOT NULL,
+  status VARCHAR(30) NOT NULL DEFAULT 'CREATED',
+  recipient_account VARCHAR(255),
+  payer_email VARCHAR(255),
+  provider_payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+  processed_at TIMESTAMP,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS billing_payments_user_created_idx
+  ON billing_payments (user_id, created_at DESC);

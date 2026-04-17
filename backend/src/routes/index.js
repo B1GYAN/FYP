@@ -1,5 +1,6 @@
 const express = require("express");
 const authRoutes = require("./authRoutes");
+const billingRoutes = require("./billingRoutes");
 const healthRoutes = require("./healthRoutes");
 const lessonRoutes = require("./lessonRoutes");
 const marketRoutes = require("./marketRoutes");
@@ -12,6 +13,7 @@ const watchlistRoutes = require("./watchlistRoutes");
 const router = express.Router();
 
 router.use("/auth", authRoutes);
+router.use("/billing", billingRoutes);
 router.use("/health", healthRoutes);
 router.use("/learn", lessonRoutes);
 router.use("/market", marketRoutes);
