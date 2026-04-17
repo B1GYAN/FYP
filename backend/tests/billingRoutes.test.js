@@ -156,6 +156,16 @@ describe("billing routes", () => {
           ],
         })
         .mockResolvedValueOnce()
+        .mockResolvedValueOnce({
+          rowCount: 1,
+          rows: [
+            {
+              subscription_tier: "STANDARD",
+            },
+          ],
+        })
+        .mockResolvedValueOnce()
+        .mockResolvedValueOnce()
         .mockResolvedValueOnce()
         .mockResolvedValueOnce(),
       release: jest.fn(),
@@ -172,7 +182,11 @@ describe("billing routes", () => {
     expect(response.text).toBe("OK");
     expect(client.query).toHaveBeenCalledWith(
       expect.stringContaining("UPDATE users"),
-      ["user-1"]
+      ["user-1", 100000]
+    );
+    expect(client.query).toHaveBeenCalledWith(
+      expect.stringContaining("UPDATE portfolios"),
+      ["user-1", 100000]
     );
   });
 
@@ -212,6 +226,16 @@ describe("billing routes", () => {
           ],
         })
         .mockResolvedValueOnce()
+        .mockResolvedValueOnce({
+          rowCount: 1,
+          rows: [
+            {
+              subscription_tier: "STANDARD",
+            },
+          ],
+        })
+        .mockResolvedValueOnce()
+        .mockResolvedValueOnce()
         .mockResolvedValueOnce()
         .mockResolvedValueOnce(),
       release: jest.fn(),
@@ -228,7 +252,11 @@ describe("billing routes", () => {
     expect(response.body.demoMode).toBe(true);
     expect(client.query).toHaveBeenCalledWith(
       expect.stringContaining("UPDATE users"),
-      ["user-1"]
+      ["user-1", 100000]
+    );
+    expect(client.query).toHaveBeenCalledWith(
+      expect.stringContaining("UPDATE portfolios"),
+      ["user-1", 100000]
     );
   });
 });
