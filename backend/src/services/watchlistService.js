@@ -1,6 +1,12 @@
 const db = require("../../db");
 const marketDataService = require("./marketDataService");
 
+function createValidationError(message) {
+  const error = new Error(message);
+  error.statusCode = 400;
+  return error;
+}
+
 function mapWatchlistRow(row) {
   return {
     id: row.id,
@@ -11,6 +17,11 @@ function mapWatchlistRow(row) {
     change: "0.0%",
     addedAt: row.created_at,
   };
+}
+
+async function getSupportedPairSet() {
+  const supportedAssets = await marketDataService.listSupportedAssets();
+  return new Set(supportedAssets.map((asset) => asset.pair));
 }
 
 async function getAllWatchlistItems(userId) {
@@ -24,7 +35,11 @@ async function getAllWatchlistItems(userId) {
     [userId]
   );
 
-  const items = result.rows.map(mapWatchlistRow);
+  const supportedPairs = await getSupportedPairSet();
+  const items = result.rows
+    .filter((row) => supportedPairs.has(`${row.symbol}/${row.quote}`))
+    .map(mapWatchlistRow);
+
   return marketDataService.enrichPairs(items);
 }
 
@@ -32,7 +47,7 @@ function normalizePair(pair) {
   const cleaned = pair.trim().toUpperCase();
 
   if (!cleaned) {
-    throw new Error("pair is required (e.g. BTC/USDT)");
+    throw createValidationError("pair is required (e.g. BTC/USDT)");
   }
 
   const [symbol, quote = "USDT"] = cleaned.includes("/")
@@ -40,7 +55,7 @@ function normalizePair(pair) {
     : [cleaned, "USDT"];
 
   if (!symbol || !quote) {
-    throw new Error("pair must include a valid symbol and quote");
+    throw createValidationError("pair must include a valid symbol and quote");
   }
 
   return {
@@ -49,8 +64,20 @@ function normalizePair(pair) {
   };
 }
 
+async function assertPairIsSupported(symbol, quote) {
+  const pair = `${symbol}/${quote}`;
+  const supportedPairs = await getSupportedPairSet();
+
+  if (!supportedPairs.has(pair)) {
+    throw createValidationError(
+      `Pair ${pair} is not supported. Use a listed market pair such as BTC/USDT.`
+    );
+  }
+}
+
 async function createWatchlistItem(userId, pair) {
   const { symbol, quote } = normalizePair(pair);
+  await assertPairIsSupported(symbol, quote);
 
   const existing = await db.query(
     `

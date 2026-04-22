@@ -94,6 +94,7 @@ export default function StrategyLab() {
           <button
             onClick={runBacktest}
             disabled={running}
+            data-cy="strategy-run-backtest"
             style={{
               width: "100%",
               padding: 10,

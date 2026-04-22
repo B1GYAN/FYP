@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import AppLogoLink from "../components/AppLogoLink";
 import SkrillUpgradeButton from "../components/SkrillUpgradeButton";
 import terminalHero from "../assets/terminal-hero.svg";
 import learningHubIllustration from "../assets/learning-hub.svg";
@@ -89,9 +90,7 @@ export default function LandingPage() {
           }}
         >
           <div>
-            <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: "-0.04em" }}>
-              PaperTrade
-            </div>
+            <AppLogoLink variant="landing" />
             <div style={{ fontSize: 13, color: "#94a3b8", marginTop: 6 }}>
               Crypto simulation terminal for practice, replay, and strategy study
             </div>

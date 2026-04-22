@@ -63,6 +63,7 @@ export default function SkrillUpgradeButton({
         type="button"
         onClick={handleUpgrade}
         disabled={submitting}
+        data-cy="billing-upgrade-button"
         style={{
           padding: "12px 16px",
           borderRadius: 14,
@@ -79,6 +80,7 @@ export default function SkrillUpgradeButton({
 
       {demoCheckout ? (
         <div
+          data-cy="billing-demo-checkout"
           style={{
             padding: "14px 16px",
             borderRadius: 14,
@@ -106,6 +108,7 @@ export default function SkrillUpgradeButton({
               type="button"
               onClick={handleDemoPayment}
               disabled={submitting}
+              data-cy="billing-demo-complete"
               style={{
                 padding: "10px 14px",
                 borderRadius: 12,

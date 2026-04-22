@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import AppLogoLink from "../components/AppLogoLink";
 import { apiRequest } from "../config/apiClient";
 import { useAuth } from "../context/AuthContext";
 import { formatCurrency } from "../utils/formatters";
@@ -125,19 +126,13 @@ export default function MainLayout({ children }) {
   return (
     <div className="app-shell">
       <header className="app-header">
-        <div className="app-header-brand">
-          <div className="app-logo-mark">PT</div>
-          <div>
-            <div className="app-logo">PaperTrade</div>
-            <div className="app-logo-subtitle">Crypto simulation terminal</div>
-          </div>
-        </div>
+        <AppLogoLink variant="header" />
 
         <div className="app-header-info">
           <span className="header-pill">
             Trader <strong>{user?.fullName || "Trader"}</strong>
           </span>
-          <span className="header-pill">
+          <span data-cy="header-plan" className="header-pill">
             Plan <strong>{user?.subscriptionTier || "STANDARD"}</strong>
           </span>
           <span className="header-pill">

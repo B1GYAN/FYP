@@ -1,8 +1,11 @@
 const db = require("../../db");
 const { getJson } = require("../utils/http");
 
-const MARKET_CACHE_TTL_MS = 5000;
-const HISTORY_CACHE_TTL_MS = 5000;
+const MARKET_CACHE_TTL_MS = 1000;
+const HISTORY_CACHE_TTL_MS = 30000;
+const CRYPTO_REST_BASE_URL = "https://api.binance.us/api/v3";
+const CRYPTO_REST_TIMEOUT_MS = 4000;
+const CRYPTO_QUOTES = new Set(["USDT"]);
 
 const currentPriceCache = new Map();
 const historicalCache = new Map();
@@ -16,6 +19,58 @@ const fallbackPrices = {
   EURUSD: { price: 1.0892, changePercent: 0.15 },
   GBPUSD: { price: 1.2745, changePercent: -0.08 },
 };
+
+const DEFAULT_SUPPORTED_ASSETS = [
+  {
+    symbol: "BTC",
+    quote: "USDT",
+    assetType: "CRYPTO",
+    providerSymbol: "BTCUSDT",
+    pair: "BTC/USDT",
+  },
+  {
+    symbol: "ETH",
+    quote: "USDT",
+    assetType: "CRYPTO",
+    providerSymbol: "ETHUSDT",
+    pair: "ETH/USDT",
+  },
+  {
+    symbol: "SOL",
+    quote: "USDT",
+    assetType: "CRYPTO",
+    providerSymbol: "SOLUSDT",
+    pair: "SOL/USDT",
+  },
+  {
+    symbol: "ADA",
+    quote: "USDT",
+    assetType: "CRYPTO",
+    providerSymbol: "ADAUSDT",
+    pair: "ADA/USDT",
+  },
+  {
+    symbol: "BNB",
+    quote: "USDT",
+    assetType: "CRYPTO",
+    providerSymbol: "BNBUSDT",
+    pair: "BNB/USDT",
+  },
+  {
+    symbol: "EUR",
+    quote: "USD",
+    assetType: "FOREX",
+    providerSymbol: "EURUSD",
+    pair: "EUR/USD",
+  },
+  {
+    symbol: "GBP",
+    quote: "USD",
+    assetType: "FOREX",
+    providerSymbol: "GBPUSD",
+    pair: "GBP/USD",
+  },
+];
 
 function normalizeProviderSymbol(symbol, quote = "USDT") {
   return `${symbol}${quote}`.replace("/", "").toUpperCase();
@@ -48,6 +103,10 @@ function cacheSet(cache, key, value, ttlMs) {
   });
 }
 
+function isRealtimeCryptoPair(symbol, quote = "USDT") {
+  return CRYPTO_QUOTES.has(String(quote || "").toUpperCase());
+}
+
 async function fetchTicker(providerSymbol) {
   const cached = cacheGet(currentPriceCache, providerSymbol);
   if (cached) {
@@ -56,14 +115,15 @@ async function fetchTicker(providerSymbol) {
 
   try {
     const data = await getJson(
-      `https://api.binance.com/api/v3/ticker/24hr?symbol=${providerSymbol}`
+      `${CRYPTO_REST_BASE_URL}/ticker/24hr?symbol=${providerSymbol}`,
+      { timeoutMs: CRYPTO_REST_TIMEOUT_MS }
     );
 
     const ticker = {
       providerSymbol,
       price: Number(data.lastPrice),
       changePercent: Number(data.priceChangePercent),
-      source: "binance",
+      source: "binance-us",
       asOf: new Date().toISOString(),
     };
 
@@ -89,6 +149,22 @@ async function fetchTicker(providerSymbol) {
 
 async function getTickerForPair(symbol, quote = "USDT") {
   const providerSymbol = normalizeProviderSymbol(symbol, quote);
+
+  if (!isRealtimeCryptoPair(symbol, quote)) {
+    const fallback = fallbackPrices[providerSymbol] || {
+      price: 100,
+      changePercent: 0,
+    };
+
+    return {
+      providerSymbol,
+      price: fallback.price,
+      changePercent: fallback.changePercent,
+      source: "fallback",
+      asOf: new Date().toISOString(),
+    };
+  }
+
   return fetchTicker(providerSymbol);
 }
 
@@ -158,11 +234,18 @@ async function getHistoricalCandles(symbol, quote = "USDT", timeframe = "1H") {
     return cached;
   }
 
+  if (!isRealtimeCryptoPair(symbol, quote)) {
+    const candles = generateFallbackHistory(symbol, quote, timeframe);
+    cacheSet(historicalCache, cacheKey, candles, HISTORY_CACHE_TTL_MS);
+    return candles;
+  }
+
   try {
     const interval = mapTimeframeToBinanceInterval(timeframe);
     const providerSymbol = normalizeProviderSymbol(symbol, quote);
     const data = await getJson(
-      `https://api.binance.com/api/v3/klines?symbol=${providerSymbol}&interval=${interval}&limit=60`
+      `${CRYPTO_REST_BASE_URL}/klines?symbol=${providerSymbol}&interval=${interval}&limit=60`,
+      { timeoutMs: CRYPTO_REST_TIMEOUT_MS }
     );
 
     const candles = data.map((candle) => ({
@@ -206,6 +289,24 @@ function mergeLiveTickerIntoCandles(candles, ticker) {
   return [...candles.slice(0, lastIndex), nextLastCandle];
 }
 
+function mapAssetRow(row) {
+  return {
+    symbol: row.symbol,
+    quote: row.quote,
+    assetType: row.asset_type,
+    providerSymbol: row.provider_symbol,
+    pair: `${row.symbol}/${row.quote}`,
+  };
+}
+
+function sortAssets(left, right) {
+  return (
+    String(left.assetType || "").localeCompare(String(right.assetType || "")) ||
+    String(left.symbol || "").localeCompare(String(right.symbol || "")) ||
+    String(left.quote || "").localeCompare(String(right.quote || ""))
+  );
+}
+
 async function listSupportedAssets() {
   const result = await db.query(
     `
@@ -216,13 +317,16 @@ async function listSupportedAssets() {
     `
   );
 
-  return result.rows.map((row) => ({
-    symbol: row.symbol,
-    quote: row.quote,
-    assetType: row.asset_type,
-    providerSymbol: row.provider_symbol,
-    pair: `${row.symbol}/${row.quote}`,
-  }));
+  const assetsByPair = new Map(
+    DEFAULT_SUPPORTED_ASSETS.map((asset) => [asset.pair, asset])
+  );
+
+  for (const row of result.rows) {
+    const asset = mapAssetRow(row);
+    assetsByPair.set(asset.pair, asset);
+  }
+
+  return Array.from(assetsByPair.values()).sort(sortAssets);
 }
 
 async function getMarketOverview() {

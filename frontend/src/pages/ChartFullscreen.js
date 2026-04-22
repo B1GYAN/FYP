@@ -1,13 +1,16 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import LoadingCard from "../components/LoadingCard";
 import CandlestickChart from "../components/CandlestickChart";
 import { apiRequest } from "../config/apiClient";
 import { useAuth } from "../context/AuthContext";
+import useLiveMarketFeed, {
+  mergeLiveCandleIntoCandles,
+} from "../hooks/useLiveMarketFeed";
 import { formatCurrency, formatPercent } from "../utils/formatters";
 
 const TIMEFRAME_OPTIONS = ["15M", "1H", "4H", "1D"];
-const REFRESH_INTERVAL_MS = 5000;
+const BACKGROUND_RESYNC_INTERVAL_MS = 30000;
 const PAIR_OPTIONS = ["BTC/USDT", "ETH/USDT", "SOL/USDT", "BNB/USDT"];
 
 export default function ChartFullscreen() {
@@ -32,6 +35,30 @@ export default function ChartFullscreen() {
   const [visibleCandles, setVisibleCandles] = useState(40);
   const [showPriceLine, setShowPriceLine] = useState(true);
   const [showHighLowGuide, setShowHighLowGuide] = useState(true);
+  const liveFeed = useLiveMarketFeed({
+    pair: selectedPair,
+    timeframe,
+  });
+  const chartData = useMemo(() => {
+    if (!data) {
+      return null;
+    }
+
+    const nextCurrentPrice = liveFeed.livePrice ?? data.currentPrice;
+
+    return {
+      ...data,
+      currentPrice: nextCurrentPrice,
+      changePercent: liveFeed.changePercent ?? data.changePercent,
+      source: liveFeed.source || data.source,
+      asOf: liveFeed.lastUpdated || data.asOf,
+      candles: mergeLiveCandleIntoCandles(
+        data.candles || [],
+        liveFeed.liveCandle,
+        nextCurrentPrice
+      ),
+    };
+  }, [data, liveFeed.changePercent, liveFeed.lastUpdated, liveFeed.liveCandle, liveFeed.livePrice, liveFeed.source]);
 
   useEffect(() => {
     let active = true;
@@ -77,7 +104,7 @@ export default function ChartFullscreen() {
 
     const intervalId = setInterval(() => {
       loadChartData(true);
-    }, REFRESH_INTERVAL_MS);
+    }, BACKGROUND_RESYNC_INTERVAL_MS);
 
     return () => {
       active = false;
@@ -144,15 +171,28 @@ export default function ChartFullscreen() {
     );
   }
 
-  const candles = data?.candles || [];
+  const candles = chartData?.candles || [];
   const latestCandle = candles[candles.length - 1];
-  const candleClose = latestCandle?.close ?? data?.currentPrice ?? 0;
+  const candleClose = latestCandle?.close ?? chartData?.currentPrice ?? 0;
   const candleMove = latestCandle ? latestCandle.close - latestCandle.open : 0;
   const candleMovePercent = latestCandle?.open
     ? (candleMove / latestCandle.open) * 100
     : 0;
   const visibleSlice = candles.slice(-visibleCandles);
   const visibleLatestCandle = visibleSlice[visibleSlice.length - 1] || latestCandle;
+  const streamConnected = liveFeed.status === "connected";
+  const effectiveLastUpdated = liveFeed.lastUpdated
+    ? new Date(liveFeed.lastUpdated)
+    : chartData?.asOf
+      ? new Date(chartData.asOf)
+      : null;
+  const liveFeedLabel = streamConnected
+    ? "Live stream connected"
+    : liveFeed.status === "reconnecting"
+      ? "Reconnecting live stream..."
+      : refreshing
+        ? "Background resync in progress"
+        : "REST fallback active";
   const currentPosition = portfolioData?.portfolio?.holdings?.find(
     (holding) => holding.pair === selectedPair
   );
@@ -274,11 +314,11 @@ export default function ChartFullscreen() {
               {formatPercent(candleMovePercent)}
             </div>
             <div style={{ fontSize: 13, color: "#94a3b8", marginTop: 8 }}>
-              {refreshing ? "Refreshing live feed..." : "Live feed active"}
+              {liveFeedLabel}
             </div>
-            {latestCandle ? (
+            {effectiveLastUpdated ? (
               <div style={{ fontSize: 13, color: "#64748b", marginTop: 4 }}>
-                Latest candle: {formatExactLabel(latestCandle.time, timeframe)}
+                Updated at {effectiveLastUpdated.toLocaleTimeString()}
               </div>
             ) : null}
           </div>
@@ -567,26 +607,6 @@ export default function ChartFullscreen() {
       </div>
     </div>
   );
-}
-
-function formatExactLabel(time, timeframe) {
-  const date = new Date(time);
-
-  if (timeframe === "1D") {
-    return date.toLocaleDateString([], {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  }
-
-  return date.toLocaleString([], {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
 }
 
 const pageStyle = {

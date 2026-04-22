@@ -23,6 +23,7 @@ export default function PremiumRoute({
   return (
     <MainLayout>
       <div
+        data-cy="premium-gate"
         className="card"
         style={{
           maxWidth: 1040,

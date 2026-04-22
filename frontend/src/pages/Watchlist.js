@@ -117,6 +117,15 @@ export default function Watchlist() {
       return;
     }
 
+    const supportedPairs = new Set(marketOverview.map((asset) => asset.pair));
+
+    if (supportedPairs.size > 0 && !supportedPairs.has(normalizedPair)) {
+      setError(
+        `Pair ${normalizedPair} is not supported. Choose one of the listed market pairs.`
+      );
+      return;
+    }
+
     await submitPair(normalizedPair);
   }
 
@@ -251,7 +260,7 @@ export default function Watchlist() {
             <div>
               <h2>Build the tape</h2>
               <p className="watchlist-section-copy">
-                Add pairs manually or pull from the current market overview.
+                Add supported pairs manually or pull from the current market overview.
               </p>
             </div>
             <div className="watchlist-mini-stat">
@@ -261,8 +270,9 @@ export default function Watchlist() {
 
           <form className="watchlist-form" onSubmit={handleAddPair}>
             <label className="watchlist-input-group">
-              <span className="watchlist-input-label">Add trading pair</span>
+              <span className="watchlist-input-label">Add supported trading pair</span>
               <input
+                data-cy="watchlist-input"
                 value={newPair}
                 onChange={(event) => setNewPair(event.target.value)}
                 placeholder="BTC/USDT"
@@ -270,6 +280,7 @@ export default function Watchlist() {
               />
             </label>
             <button
+              data-cy="watchlist-add"
               type="submit"
               disabled={adding}
               className="watchlist-button watchlist-button-primary watchlist-add-button"

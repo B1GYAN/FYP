@@ -26,3 +26,7 @@ yarn-error.log*
 *.out.log
 backend-*.log
 frontend-*.log
+
+# local export bundles
+23050164BigyanLamaPapertrade.zip
+23050164BigyanLamaPapertrade/

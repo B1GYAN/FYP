@@ -1,10 +1,20 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import MainLayout from "../layout/MainLayout";
 import LoadingCard from "../components/LoadingCard";
 import { apiRequest } from "../config/apiClient";
 import { useAuth } from "../context/AuthContext";
+import useLiveMarketFeed from "../hooks/useLiveMarketFeed";
 import useAsyncData from "../hooks/useAsyncData";
 import { formatCurrency } from "../utils/formatters";
+
+const CURRENT_PRICE_RESYNC_MS = 30000;
+const DEFAULT_TRADING_PAIRS = [
+  "BTC/USDT",
+  "ETH/USDT",
+  "SOL/USDT",
+  "ADA/USDT",
+  "BNB/USDT",
+];
 
 export default function Trading() {
   const { token } = useAuth();
@@ -17,6 +27,8 @@ export default function Trading() {
   const [timeInForce, setTimeInForce] = useState("Day");
   const [submitError, setSubmitError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [selectedMarketQuote, setSelectedMarketQuote] = useState(null);
+  const liveFeed = useLiveMarketFeed({ pair: symbol });
 
   const loadTradingWorkspace = useCallback(async () => {
     const [portfolio, orders, market] = await Promise.all([
@@ -28,6 +40,40 @@ export default function Trading() {
     return { portfolio, orders, market };
   }, [token]);
   const { data, setData, loading, error } = useAsyncData(loadTradingWorkspace);
+
+  useEffect(() => {
+    let active = true;
+    setSelectedMarketQuote(null);
+
+    async function loadSelectedMarketQuote() {
+      try {
+        const marketQuote = await apiRequest(
+          `/api/market/charts?pair=${encodeURIComponent(symbol)}&timeframe=1H`
+        );
+
+        if (!active) {
+          return;
+        }
+
+        setSelectedMarketQuote(marketQuote);
+      } catch (loadError) {
+        if (active) {
+          setSelectedMarketQuote(null);
+        }
+      }
+    }
+
+    loadSelectedMarketQuote();
+
+    const intervalId = window.setInterval(() => {
+      loadSelectedMarketQuote();
+    }, CURRENT_PRICE_RESYNC_MS);
+
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+    };
+  }, [symbol]);
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -98,13 +144,33 @@ export default function Trading() {
 
   const market = data?.market || [];
   const selectedMarket = market.find((item) => item.pair === symbol);
+  const currentPrice =
+    liveFeed.livePrice ?? selectedMarketQuote?.currentPrice ?? selectedMarket?.price ?? null;
   const positions = data?.portfolio?.holdings || [];
   const orders = data?.orders || [];
   const selectedPosition = positions.find((position) => position.pair === symbol);
+  const tradingPairs = Array.from(
+    new Set([
+      ...DEFAULT_TRADING_PAIRS,
+      ...market.map((item) => item.pair),
+      symbol,
+    ])
+  );
   const sideIntent =
     side === "Buy"
       ? "Build or add to a long, or cover an existing short."
       : "Reduce a long, or open or extend a short position.";
+  const priceFeedLabel =
+    liveFeed.status === "connected"
+      ? "Live stream connected"
+      : liveFeed.status === "reconnecting"
+        ? "Reconnecting live stream..."
+        : "REST fallback active";
+  const priceFeedUpdatedAt = liveFeed.lastUpdated
+    ? new Date(liveFeed.lastUpdated)
+    : selectedMarketQuote?.asOf
+      ? new Date(selectedMarketQuote.asOf)
+      : null;
 
   return (
     <MainLayout>
@@ -137,20 +203,22 @@ export default function Trading() {
                   Trading Pair
                 </label>
                 <select
+                  data-cy="trading-pair"
                   value={symbol}
                   onChange={(e) => setSymbol(e.target.value)}
                   style={inputStyle}
                 >
-                  <option>BTC/USDT</option>
-                  <option>ETH/USDT</option>
-                  <option>SOL/USDT</option>
-                  <option>ADA/USDT</option>
-                  <option>BNB/USDT</option>
+                  {tradingPairs.map((pair) => (
+                    <option key={pair} value={pair}>
+                      {pair}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div>
                 <label style={{ fontSize: 13, color: "#cbd5f5" }}>Action</label>
                 <select
+                  data-cy="trading-side"
                   value={side}
                   onChange={(e) => setSide(e.target.value)}
                   style={inputStyle}
@@ -194,6 +262,7 @@ export default function Trading() {
               <div>
                 <label style={{ fontSize: 13, color: "#cbd5f5" }}>Quantity</label>
                 <input
+                  data-cy="trading-quantity"
                   type="number"
                   min="0"
                   step="0.01"
@@ -207,6 +276,7 @@ export default function Trading() {
                   Order Type
                 </label>
                 <select
+                  data-cy="trading-order-type"
                   value={orderType}
                   onChange={(e) => setOrderType(e.target.value)}
                   style={inputStyle}
@@ -222,6 +292,7 @@ export default function Trading() {
                 Limit Price (USDT)
               </label>
               <input
+                data-cy="trading-limit-price"
                 type="number"
                 value={limitPrice}
                 onChange={(e) => setLimitPrice(e.target.value)}
@@ -235,6 +306,7 @@ export default function Trading() {
                 Stop-Loss (optional)
               </label>
               <input
+                data-cy="trading-stop-loss"
                 type="number"
                 value={stopLoss}
                 onChange={(e) => setStopLoss(e.target.value)}
@@ -248,6 +320,7 @@ export default function Trading() {
                 Time in Force
               </label>
               <select
+                data-cy="trading-time-in-force"
                 value={timeInForce}
                 onChange={(e) => setTimeInForce(e.target.value)}
                 style={inputStyle}
@@ -258,7 +331,7 @@ export default function Trading() {
             </div>
 
             {submitError ? (
-              <div style={{ marginBottom: 10, fontSize: 12, color: "#fca5a5" }}>
+              <div data-cy="trading-error" style={{ marginBottom: 10, fontSize: 12, color: "#fca5a5" }}>
                 {submitError}
               </div>
             ) : null}
@@ -267,6 +340,7 @@ export default function Trading() {
               <button
                 type="submit"
                 disabled={submitting}
+                data-cy="trading-submit"
                 style={{
                   flex: 1,
                   padding: 10,
@@ -308,7 +382,13 @@ export default function Trading() {
             </p>
             <p className="text-muted" style={{ fontSize: 13 }}>
               Current price for {symbol}:{" "}
-              {selectedMarket ? formatCurrency(selectedMarket.price, 4) : "--"}
+              {currentPrice !== null ? formatCurrency(currentPrice, 4) : "--"}
+            </p>
+            <p className="text-muted" style={{ fontSize: 13 }}>
+              Price feed: {priceFeedLabel}
+              {priceFeedUpdatedAt
+                ? ` (${priceFeedUpdatedAt.toLocaleTimeString()})`
+                : ""}
             </p>
             <p className="text-muted" style={{ fontSize: 13, marginBottom: 0 }}>
               Active position for {symbol}:{" "}

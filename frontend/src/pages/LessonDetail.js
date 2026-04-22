@@ -138,12 +138,17 @@ export default function LessonDetail() {
   return (
     <MainLayout>
       <div style={{ marginBottom: 16 }}>
-        <button type="button" onClick={() => navigate("/learn")} style={backButtonStyle}>
+        <button
+          data-cy="lesson-back-to-classes"
+          type="button"
+          onClick={() => navigate("/learn")}
+          style={backButtonStyle}
+        >
           Back to Classes
         </button>
       </div>
 
-      <div className="card" style={{ marginBottom: 16 }}>
+      <div data-cy="lesson-detail" className="card" style={{ marginBottom: 16 }}>
         <div
           style={{
             display: "flex",
@@ -166,7 +171,10 @@ export default function LessonDetail() {
 
           <div className="card" style={{ minWidth: 240, background: "#0f172a" }}>
             <div style={{ fontSize: 12, color: "#94a3b8" }}>Lesson Status</div>
-            <div style={{ marginTop: 8, fontSize: 18, fontWeight: 700 }}>
+            <div
+              data-cy="lesson-status"
+              style={{ marginTop: 8, fontSize: 18, fontWeight: 700 }}
+            >
               {lesson.status.replace("_", " ")}
             </div>
             <div style={{ marginTop: 8, fontSize: 12, color: "#94a3b8" }}>
@@ -235,13 +243,18 @@ export default function LessonDetail() {
               Read the content on this page, review the quiz material, then mark the class complete.
             </p>
 
-            <button onClick={toggleComplete} style={primaryActionStyle(lesson.status === "COMPLETED")}>
+            <button
+              data-cy="lesson-toggle-complete"
+              onClick={toggleComplete}
+              style={primaryActionStyle(lesson.status === "COMPLETED")}
+            >
               {lesson.status === "COMPLETED"
                 ? "Mark Class Incomplete"
                 : "Mark Class Complete"}
             </button>
 
             <button
+              data-cy="lesson-open-quiz"
               onClick={openQuiz}
               disabled={!lesson.quizId || !lesson.quizUnlocked}
               style={quizButtonStyle(lesson.quizUnlocked)}
@@ -251,6 +264,7 @@ export default function LessonDetail() {
 
             {quizError ? (
               <div
+                data-cy="lesson-quiz-error"
                 style={{
                   marginTop: 12,
                   fontSize: 12,
@@ -279,7 +293,7 @@ export default function LessonDetail() {
       </div>
 
       {selectedQuiz ? (
-        <div className="card mt-16">
+        <div data-cy="lesson-quiz" className="card mt-16">
           <h2>{selectedQuiz.title}</h2>
           <p style={{ marginTop: 0, color: "#94a3b8", fontSize: 13 }}>
             Answer all questions after reviewing the class contents and quiz material.
@@ -288,6 +302,7 @@ export default function LessonDetail() {
           {selectedQuiz.questions.map((question, index) => (
             <div
               key={question.id}
+              data-cy="lesson-quiz-question"
               style={{
                 marginBottom: 16,
                 padding: 14,
@@ -303,6 +318,7 @@ export default function LessonDetail() {
                 {question.answerOptions.map((option) => (
                   <button
                     key={option}
+                    data-cy="lesson-quiz-option"
                     onClick={() =>
                       setAnswers((prev) => ({
                         ...prev,
@@ -328,12 +344,12 @@ export default function LessonDetail() {
             </div>
           ))}
 
-          <button className="auth-button" onClick={submitQuiz}>
+          <button data-cy="lesson-quiz-submit" className="auth-button" onClick={submitQuiz}>
             Submit Quiz
           </button>
 
           {quizResult ? (
-            <p style={{ marginTop: 12, fontSize: 13 }}>
+            <p data-cy="lesson-quiz-score" style={{ marginTop: 12, fontSize: 13 }}>
               Score: <strong>{quizResult.scorePercent}%</strong> (
               {quizResult.correctCount}/{quizResult.totalQuestions})
             </p>
