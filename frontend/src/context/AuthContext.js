@@ -7,7 +7,7 @@ import {
 } from "react";
 import { apiRequest } from "../config/apiClient";
 
-const AUTH_STORAGE_KEY = "papertrade_auth";
+export const AUTH_STORAGE_KEY = "papertrade_auth";
 const AuthContext = createContext(null);
 
 function loadStoredAuth() {
@@ -17,6 +17,10 @@ function loadStoredAuth() {
   } catch (error) {
     return null;
   }
+}
+
+export function hasStoredAuthSession() {
+  return Boolean(loadStoredAuth()?.token);
 }
 
 export function AuthProvider({ children }) {
@@ -60,6 +64,24 @@ export function AuthProvider({ children }) {
     restoreSession();
   }, [applySessionProfile, storedSession]);
 
+  useEffect(() => {
+    function syncAuthWithStorage() {
+      if (!hasStoredAuthSession()) {
+        setAuthState(null);
+      }
+    }
+
+    window.addEventListener("storage", syncAuthWithStorage);
+    window.addEventListener("focus", syncAuthWithStorage);
+    document.addEventListener("visibilitychange", syncAuthWithStorage);
+
+    return () => {
+      window.removeEventListener("storage", syncAuthWithStorage);
+      window.removeEventListener("focus", syncAuthWithStorage);
+      document.removeEventListener("visibilitychange", syncAuthWithStorage);
+    };
+  }, []);
+
   async function authenticate(path, payload) {
     const body = await apiRequest(path, {
       method: "POST",
@@ -101,7 +123,7 @@ export function AuthProvider({ children }) {
   const value = {
     user: authState?.user || null,
     token: authState?.token || null,
-    isAuthenticated: Boolean(authState?.token),
+    isAuthenticated: Boolean(authState?.token && hasStoredAuthSession()),
     subscriptionTier: authState?.user?.subscriptionTier || "STANDARD",
     isPremium: authState?.user?.isPremium || false,
     isBootstrapping,

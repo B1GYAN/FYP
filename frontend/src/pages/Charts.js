@@ -1,10 +1,13 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import MainLayout from "../layout/MainLayout";
 import LoadingCard from "../components/LoadingCard";
 import CandlestickChart from "../components/CandlestickChart";
 import ChartWatchlistDrawer from "../components/ChartWatchlistDrawer";
 import { apiRequest } from "../config/apiClient";
 import { useAuth } from "../context/AuthContext";
+import useLiveMarketFeed, {
+  mergeLiveCandleIntoCandles,
+} from "../hooks/useLiveMarketFeed";
 import { formatCurrency, formatPercent } from "../utils/formatters";
 import {
   loadChartLayouts,
@@ -20,7 +23,7 @@ import {
 
 const TIMEFRAME_OPTIONS = ["15M", "1H", "4H", "1D"];
 const PAIR_OPTIONS = ["BTC/USDT", "ETH/USDT", "SOL/USDT", "BNB/USDT"];
-const REFRESH_INTERVAL_MS = 5000;
+const BACKGROUND_RESYNC_INTERVAL_MS = 30000;
 const REPLAY_SPEED_OPTIONS = [
   { label: "0.5x", value: 1600 },
   { label: "1x", value: 900 },
@@ -57,7 +60,34 @@ export default function Charts() {
   const [replayPlaying, setReplayPlaying] = useState(false);
   const [replaySpeed, setReplaySpeed] = useState(REPLAY_SPEED_OPTIONS[1].value);
 
-  const candles = data?.candles || [];
+  const liveFeed = useLiveMarketFeed({
+    pair: selectedPair,
+    timeframe,
+    disabled: replayMode,
+  });
+  const liveChartData = useMemo(() => {
+    if (!data) {
+      return null;
+    }
+
+    const nextCurrentPrice = liveFeed.livePrice ?? data.currentPrice;
+    const nextCandles = mergeLiveCandleIntoCandles(
+      data.candles || [],
+      liveFeed.liveCandle,
+      nextCurrentPrice
+    );
+
+    return {
+      ...data,
+      currentPrice: nextCurrentPrice,
+      changePercent: liveFeed.changePercent ?? data.changePercent,
+      source: liveFeed.source || data.source,
+      asOf: liveFeed.lastUpdated || data.asOf,
+      candles: nextCandles,
+    };
+  }, [data, liveFeed.changePercent, liveFeed.lastUpdated, liveFeed.liveCandle, liveFeed.livePrice, liveFeed.source]);
+  const chartData = liveChartData || data;
+  const candles = chartData?.candles || [];
 
   const applySessionMode = useCallback(
     (nextMode, options = {}) => {
@@ -154,7 +184,7 @@ export default function Charts() {
 
     const intervalId = setInterval(() => {
       loadChartData(true);
-    }, REFRESH_INTERVAL_MS);
+    }, BACKGROUND_RESYNC_INTERVAL_MS);
 
     return () => {
       active = false;
@@ -290,7 +320,7 @@ export default function Charts() {
     : candles;
   const latestCandle = displayedCandles[displayedCandles.length - 1];
   const earliestCandle = displayedCandles[0];
-  const candleClose = latestCandle?.close ?? data?.currentPrice ?? 0;
+  const candleClose = latestCandle?.close ?? chartData?.currentPrice ?? 0;
   const candleMove = latestCandle ? latestCandle.close - latestCandle.open : 0;
   const candleMovePercent = latestCandle?.open
     ? (candleMove / latestCandle.open) * 100
@@ -318,6 +348,42 @@ export default function Charts() {
   const activeSessionMode =
     SESSION_MODE_OPTIONS.find((option) => option.value === sessionMode) ||
     SESSION_MODE_OPTIONS[0];
+  const streamConnected = liveFeed.status === "connected";
+  const effectiveLastUpdated = liveFeed.lastUpdated
+    ? new Date(liveFeed.lastUpdated)
+    : lastUpdated;
+  const feedStatusValue = replayMode
+    ? `${replayProgress}% replayed`
+    : streamConnected
+      ? "Streaming live"
+      : liveFeed.status === "reconnecting"
+        ? "Reconnecting"
+        : refreshing
+          ? "Background resync"
+          : "REST fallback";
+  const feedStatusNote = replayMode
+    ? "Replay ignores live auto-refresh"
+    : effectiveLastUpdated
+      ? `Updated ${effectiveLastUpdated.toLocaleTimeString()}`
+      : liveFeed.status === "connecting"
+        ? "Opening live market stream"
+        : "Awaiting sync";
+  const feedBadgeLabel = replayMode
+    ? "Replay mode active"
+    : streamConnected
+      ? "Live stream connected"
+      : liveFeed.status === "reconnecting"
+        ? "Reconnecting live stream"
+        : refreshing
+          ? "Background resync"
+          : "REST fallback active";
+  const feedBadgeColor = replayMode
+    ? "#fbbf24"
+    : streamConnected
+      ? "#14b8a6"
+      : liveFeed.status === "reconnecting"
+        ? "#f59e0b"
+        : "#94a3b8";
 
   const openFullscreenChart = () => {
     const query = new URLSearchParams({
@@ -382,6 +448,11 @@ export default function Charts() {
   };
 
   const toggleReplayMode = () => {
+    if (!replayMode && !isPremium) {
+      setPremiumNotice("Replay mode is available on Premium plans only.");
+      return;
+    }
+
     applySessionMode(replayMode ? "LIVE" : "REPLAY");
   };
 
@@ -485,7 +556,7 @@ export default function Charts() {
                 textTransform: "uppercase",
               }}
             >
-              {data.pair} Overview
+              {chartData?.pair} Overview
             </div>
             <div
               style={{
@@ -545,20 +616,8 @@ export default function Charts() {
               />
               <SignalCard
                 label="Feed Status"
-                value={
-                  replayMode
-                    ? `${replayProgress}% replayed`
-                    : refreshing
-                      ? "Updating now"
-                      : "Stable stream"
-                }
-                note={
-                  replayMode
-                    ? "Replay ignores live auto-refresh"
-                    : lastUpdated
-                      ? `Updated ${lastUpdated.toLocaleTimeString()}`
-                      : "Awaiting sync"
-                }
+                value={feedStatusValue}
+                note={feedStatusNote}
                 accent="#7dd3fc"
               />
               <SignalCard
@@ -573,8 +632,12 @@ export default function Charts() {
           <div style={{ display: "grid", gap: 12, alignContent: "start" }}>
             <HeroStat
               label="Source"
-              value={data.source || "Market feed"}
-              note="Streaming market data"
+              value={chartData?.source || "Market feed"}
+              note={
+                streamConnected
+                  ? "Direct Binance.US live stream"
+                  : "REST load with live reconnect fallback"
+              }
             />
             <HeroStat
               label="Latest Candle"
@@ -896,16 +959,15 @@ export default function Charts() {
               value={
                 replayMode
                   ? `Frame ${Math.min(replayIndex + 1, candles.length)}`
-                  : refreshing
-                    ? "Refreshing..."
-                    : formatCurrency(data.currentPrice, 4)
+                  : chartData?.currentPrice !== null &&
+                      chartData?.currentPrice !== undefined
+                    ? formatCurrency(chartData.currentPrice, 4)
+                    : "Awaiting feed"
               }
               note={
                 replayMode
                   ? "Live feed paused while replay mode is active"
-                  : lastUpdated
-                    ? `Feed update ${lastUpdated.toLocaleTimeString()}`
-                    : "Waiting for first update"
+                  : feedStatusNote
               }
               accent={replayMode ? "#fbbf24" : "#7dd3fc"}
             />
@@ -943,6 +1005,7 @@ export default function Charts() {
 
       {premiumNotice ? (
         <div
+          data-cy="charts-replay-lock-notice"
           className="card"
           style={{
             marginBottom: 18,
@@ -974,7 +1037,7 @@ export default function Charts() {
                 textTransform: "uppercase",
               }}
             >
-              {data.pair} {timeframe} candles
+              {chartData?.pair} {timeframe} candles
             </div>
             <div style={{ fontSize: 28, fontWeight: 700, marginTop: 6 }}>
               {formatCurrency(candleClose, 4)}
@@ -1009,20 +1072,14 @@ export default function Charts() {
                   width: 8,
                   height: 8,
                   borderRadius: "50%",
-                  background: refreshing ? "#f59e0b" : "#14b8a6",
-                  boxShadow: refreshing
-                    ? "0 0 12px rgba(245, 158, 11, 0.7)"
-                    : "0 0 12px rgba(20, 184, 166, 0.7)",
+                  background: feedBadgeColor,
+                  boxShadow: `0 0 12px ${feedBadgeColor}`,
                 }}
               />
-              {replayMode
-                ? "Replay mode active"
-                : refreshing
-                  ? "Refreshing feed"
-                  : "Realtime refresh every 5s"}
+              {feedBadgeLabel}
             </div>
             <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 10 }}>
-              Feed source: {data.source}
+              Feed source: {chartData?.source}
             </div>
             {latestCandle ? (
               <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 6 }}>

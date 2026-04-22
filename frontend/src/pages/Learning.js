@@ -88,12 +88,13 @@ export default function Learning() {
         )}
       </div>
 
-      <div className="card">
+      <div data-cy="learning-library" className="card">
         <h2>Class Library</h2>
         <div style={{ display: "grid", gap: 14 }}>
           {lessons.map((lesson, index) => (
             <div
               key={lesson.id}
+              data-cy="learning-lesson-card"
               style={{
                 border: "1px solid #1f2937",
                 borderRadius: 14,
@@ -122,10 +123,11 @@ export default function Learning() {
                 </div>
 
                 <div style={{ minWidth: 220, display: "flex", flexDirection: "column", gap: 10 }}>
-                  <div style={statusBadgeStyle(lesson.status)}>
+                  <div data-cy="learning-lesson-status" style={statusBadgeStyle(lesson.status)}>
                     {lesson.status.replace("_", " ")}
                   </div>
                   <button
+                    data-cy="learning-open-class"
                     type="button"
                     onClick={() => navigate(`/learn/lessons/${lesson.id}`)}
                     style={openClassButtonStyle}

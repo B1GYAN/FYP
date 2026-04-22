@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import AppLogoLink from "../components/AppLogoLink";
 import { useAuth } from "../context/AuthContext";
 
 export default function Login() {
@@ -28,7 +29,7 @@ export default function Login() {
   return (
     <div className="auth-page">
       <div className="auth-card">
-        <div className="auth-brand">PaperTrade</div>
+        <AppLogoLink variant="auth" />
         <h1 className="auth-title">Sign in to your simulator account</h1>
         <p className="auth-subtitle">
           Practice crypto and FX trading with virtual funds and track your
@@ -39,6 +40,7 @@ export default function Login() {
           <label className="auth-label">
             Email
             <input
+              data-cy="login-email"
               className="auth-input"
               type="email"
               value={email}
@@ -50,6 +52,7 @@ export default function Login() {
           <label className="auth-label">
             Password
             <input
+              data-cy="login-password"
               className="auth-input"
               type="password"
               value={password}
@@ -58,9 +61,9 @@ export default function Login() {
             />
           </label>
 
-          {error ? <div className="auth-error">{error}</div> : null}
+          {error ? <div className="auth-error" data-cy="login-error">{error}</div> : null}
 
-          <button className="auth-button" type="submit" disabled={submitting}>
+          <button className="auth-button" type="submit" disabled={submitting} data-cy="login-submit">
             {submitting ? "Signing in..." : "Login"}
           </button>
         </form>

@@ -78,6 +78,7 @@ export default function BillingReturn() {
   return (
     <MainLayout>
       <div
+        data-cy="billing-return"
         className="card"
         style={{
           maxWidth: 760,
@@ -107,7 +108,7 @@ export default function BillingReturn() {
           Skrill Checkout
         </div>
 
-        <h1 className="page-title" style={{ marginBottom: 12 }}>
+        <h1 data-cy="billing-return-title" className="page-title" style={{ marginBottom: 12 }}>
           {title}
         </h1>
         <p className="page-subtitle" style={{ marginBottom: 18 }}>
@@ -128,8 +129,13 @@ export default function BillingReturn() {
               marginBottom: 22,
             }}
           >
-            <StatusRow label="Plan" value={payment?.planCode || "PREMIUM_MONTHLY"} />
             <StatusRow
+              dataCy="billing-return-plan"
+              label="Plan"
+              value={payment?.planCode || "PREMIUM_MONTHLY"}
+            />
+            <StatusRow
+              dataCy="billing-return-amount"
               label="Amount"
               value={
                 payment
@@ -137,16 +143,20 @@ export default function BillingReturn() {
                   : "--"
               }
             />
-            <StatusRow label="Status" value={status} />
-            <StatusRow label="Payment ID" value={payment?.id || paymentId} />
+            <StatusRow dataCy="billing-return-status" label="Status" value={status} />
+            <StatusRow
+              dataCy="billing-return-payment-id"
+              label="Payment ID"
+              value={payment?.id || paymentId}
+            />
           </div>
         )}
 
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <Link to="/dashboard" style={primaryLinkStyle}>
+          <Link data-cy="billing-return-dashboard-link" to="/dashboard" style={primaryLinkStyle}>
             Back to Dashboard
           </Link>
-          <Link to="/" style={secondaryLinkStyle}>
+          <Link data-cy="billing-return-plans-link" to="/" style={secondaryLinkStyle}>
             View Plans
           </Link>
         </div>
@@ -155,9 +165,10 @@ export default function BillingReturn() {
   );
 }
 
-function StatusRow({ label, value }) {
+function StatusRow({ label, value, dataCy }) {
   return (
     <div
+      data-cy={dataCy}
       style={{
         padding: "12px 14px",
         borderRadius: 14,

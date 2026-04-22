@@ -41,37 +41,53 @@ a {
   z-index: 20;
 }
 
-.app-header-brand {
-  display: flex;
+.app-logo-link {
+  display: inline-flex;
   align-items: center;
-  gap: 14px;
+  justify-content: center;
+  width: fit-content;
+  border-radius: 24px;
+  border: 1px solid transparent;
+  padding: 4px;
+  transition: transform 0.18s ease, border-color 0.18s ease,
+    background 0.18s ease, box-shadow 0.18s ease;
 }
 
-.app-logo-mark {
-  width: 44px;
-  height: 44px;
-  display: grid;
-  place-items: center;
-  border-radius: 14px;
-  background: linear-gradient(135deg, #14b8a6, #0f766e);
-  color: #ecfeff;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  box-shadow: 0 14px 36px rgba(20, 184, 166, 0.22);
+.app-logo-link:hover {
+  transform: translateY(-1px);
+  border-color: rgba(45, 212, 191, 0.26);
+  background: rgba(15, 23, 42, 0.76);
+  box-shadow: 0 18px 34px rgba(2, 6, 23, 0.26);
 }
 
-.app-logo {
-  font-weight: 700;
-  font-size: 22px;
-  letter-spacing: 0.02em;
+.app-logo-link:focus-visible {
+  outline: none;
+  border-color: rgba(45, 212, 191, 0.52);
+  box-shadow: 0 0 0 4px rgba(20, 184, 166, 0.18);
 }
 
-.app-logo-subtitle {
-  margin-top: 3px;
-  color: #94a3b8;
-  font-size: 12px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+.app-logo-link-auth {
+  display: flex;
+  margin: 0 auto 18px;
+}
+
+.app-logo-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 18px;
+}
+
+.app-logo-image-header {
+  width: min(176px, 38vw);
+}
+
+.app-logo-image-landing {
+  width: min(220px, 58vw);
+}
+
+.app-logo-image-auth {
+  width: min(196px, 100%);
 }
 
 .app-header-info {
@@ -926,6 +942,10 @@ a {
     padding: 16px 18px;
   }
 
+  .app-logo-image-header {
+    width: min(148px, 52vw);
+  }
+
   .app-body {
     flex-direction: column;
   }
@@ -1007,15 +1027,6 @@ a {
   border: 1px solid #2f2a45;
   background: rgba(10, 15, 28, 0.96);
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
-}
-
-.auth-brand {
-  margin-bottom: 14px;
-  font-size: 14px;
-  font-weight: 700;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: #5eead4;
 }
 
 .auth-title {

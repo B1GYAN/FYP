@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import AppLogoLink from "../components/AppLogoLink";
 import { useAuth } from "../context/AuthContext";
 
 export default function Register() {
@@ -29,7 +30,7 @@ export default function Register() {
   return (
     <div className="auth-page">
       <div className="auth-card">
-        <div className="auth-brand">PaperTrade</div>
+        <AppLogoLink variant="auth" />
         <h1 className="auth-title">Create your simulator account</h1>
         <p className="auth-subtitle">
           New users start on the Standard plan with a virtual balance so they can
@@ -40,6 +41,7 @@ export default function Register() {
           <label className="auth-label">
             Full Name
             <input
+              data-cy="register-full-name"
               className="auth-input"
               value={fullName}
               onChange={(event) => setFullName(event.target.value)}
@@ -50,6 +52,7 @@ export default function Register() {
           <label className="auth-label">
             Email
             <input
+              data-cy="register-email"
               className="auth-input"
               type="email"
               value={email}
@@ -61,6 +64,7 @@ export default function Register() {
           <label className="auth-label">
             Password
             <input
+              data-cy="register-password"
               className="auth-input"
               type="password"
               value={password}
@@ -79,9 +83,9 @@ export default function Register() {
             </div>
           </div>
 
-          {error ? <div className="auth-error">{error}</div> : null}
+          {error ? <div className="auth-error" data-cy="register-error">{error}</div> : null}
 
-          <button className="auth-button" type="submit" disabled={submitting}>
+          <button className="auth-button" type="submit" disabled={submitting} data-cy="register-submit">
             {submitting ? "Creating account..." : "Register"}
           </button>
         </form>
